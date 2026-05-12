@@ -1,0 +1,1909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accoly - PDF Annotation Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --accent: #4a9eff;
+            --accent-hover: #3a8eef;
+            --border-color: #404040;
+            --success: #4caf50;
+            --danger: #ff6b6b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+        }
+
+        .toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-right: 1px solid var(--border-color);
+            padding-right: 12px;
+        }
+
+        .toolbar-section:last-child {
+            border-right: none;
+        }
+
+        .toolbar-title {
+            font-weight: 600;
+            margin-right: 16px;
+            min-width: 120px;
+        }
+
+        /* Buttons */
+        button {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent);
+        }
+
+        button.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+            box-shadow: 0 0 12px rgba(74, 158, 255, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Tool Buttons */
+        .tool-btn {
+            min-width: 44px;
+            height: 36px;
+            padding: 0 10px;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        /* Input Controls */
+        input[type="range"] {
+            width: 80px;
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(74, 158, 255, 0.3);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 8px rgba(74, 158, 255, 0.3);
+        }
+
+        input[type="color"] {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            background: var(--bg-tertiary);
+        }
+
+        input[type="number"] {
+            width: 60px;
+            padding: 6px 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* Pill Switch */
+        .pill-switch {
+            display: inline-flex;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2px;
+            gap: 0;
+        }
+
+        .pill-switch button {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            font-size: 12px;
+            border-radius: 18px;
+            transition: all 0.2s ease;
+            color: var(--text-secondary);
+        }
+
+        .pill-switch button.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: none;
+        }
+
+        /* Main Content */
+        .content-wrapper {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 120px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 8px;
+            transition: width 0.3s ease;
+        }
+
+        .sidebar.hidden {
+            width: 0;
+            overflow: hidden;
+            padding: 0;
+        }
+
+        .thumbnail {
+            width: 100%;
+            aspect-ratio: 0.7 / 1;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 8px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .thumbnail:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(74, 158, 255, 0.2);
+        }
+
+        .thumbnail.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 16px rgba(74, 158, 255, 0.4);
+        }
+
+        .thumbnail canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Canvas Area */
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0f0f0f;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            position: relative;
+        }
+
+        .canvas-wrapper::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        .canvas-wrapper::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        .canvas-wrapper::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 5px;
+        }
+
+        .canvas-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--border-color);
+        }
+
+        .page-container {
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            background: white;
+            margin: 10px auto;
+        }
+
+        .page-container canvas {
+            display: block;
+        }
+
+        .annotation-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: crosshair;
+        }
+
+        .textbox-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .textbox-layer.active {
+            pointer-events: auto;
+        }
+
+        /* Textbox */
+        .textbox {
+            position: absolute;
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px;
+            min-width: 80px;
+            min-height: 24px;
+            cursor: default;
+            user-select: none;
+            transition: box-shadow 0.2s ease;
+            font-family: Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .textbox:hover {
+            box-shadow: 0 0 12px rgba(74, 158, 255, 0.3);
+        }
+
+        .textbox.selected {
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 16px rgba(74, 158, 255, 0.4);
+        }
+
+        .textbox.editing {
+            border: 2px solid var(--accent);
+        }
+
+        .textbox-content {
+            outline: none;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            font-size: 14px;
+            color: #000;
+            width: 100%;
+            height: 100%;
+        }
+
+        .textbox-content:focus {
+            outline: none;
+        }
+
+        .textbox-handle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border: 1px solid white;
+            border-radius: 2px;
+            cursor: pointer;
+            display: none;
+        }
+
+        .textbox.selected .textbox-handle {
+            display: block;
+        }
+
+        .textbox-handle.nw { top: -4px; left: -4px; cursor: nwse-resize; }
+        .textbox-handle.ne { top: -4px; right: -4px; cursor: nesw-resize; }
+        .textbox-handle.sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+        .textbox-handle.se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+        .textbox-handle.n { top: -4px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+        .textbox-handle.s { bottom: -4px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+        .textbox-handle.w { top: 50%; left: -4px; transform: translateY(-50%); cursor: ew-resize; }
+        .textbox-handle.e { top: 50%; right: -4px; transform: translateY(-50%); cursor: ew-resize; }
+
+        /* Sticky Note */
+        .sticky-note {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            background: #ffeb3b;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            cursor: move;
+            font-size: 13px;
+            z-index: 50;
+        }
+
+        .sticky-note-header {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 8px;
+        }
+
+        .sticky-note-delete {
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            border: none;
+            color: rgba(0, 0, 0, 0.6);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+        }
+
+        .sticky-note-delete:hover {
+            background: rgba(0, 0, 0, 0.1);
+            color: rgba(0, 0, 0, 0.8);
+        }
+
+        .sticky-note-content {
+            outline: none;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            border: none;
+            resize: none;
+            font-family: 'Comic Sans MS', cursive;
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.8);
+        }
+
+        /* Formatting Toolbar */
+        .formatting-toolbar {
+            position: absolute;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            max-width: 600px;
+            z-index: 200;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+        }
+
+        .formatting-toolbar select {
+            padding: 6px 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        /* Loading Indicator */
+        .loading-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px 32px;
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .loading-indicator.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--bg-tertiary);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 8px 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-item {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        /* Utility Classes */
+        .hidden {
+            display: none !important;
+        }
+
+        .separator {
+            width: 1px;
+            height: 24px;
+            background: var(--border-color);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .toolbar {
+                padding: 8px;
+                gap: 6px;
+            }
+
+            .toolbar-section {
+                padding-right: 8px;
+            }
+
+            .sidebar {
+                width: 80px;
+            }
+
+            .formatting-toolbar {
+                max-width: calc(100vw - 32px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="toolbar-title">Accoly</div>
+            
+            <div class="toolbar-section">
+                <input type="file" id="pdfInput" accept=".pdf" style="display: none;">
+                <button id="openBtn" title="Open PDF">📂 Open</button>
+                <button id="sidebarToggle" title="Toggle sidebar">☰ Sidebar</button>
+            </div>
+
+            <div class="toolbar-section">
+                <button class="tool-btn" id="penBtn" title="Pen tool (P)" data-tool="pen">✏️ Pen</button>
+                <button class="tool-btn" id="pencilBtn" title="Pencil tool (C)" data-tool="pencil">✐ Pencil</button>
+                <button class="tool-btn" id="highlighterBtn" title="Highlighter (H)" data-tool="highlighter">🖍️ HL</button>
+                <button class="tool-btn" id="eraserBtn" title="Eraser (E)" data-tool="eraser">⌫ Eraser</button>
+                <button class="tool-btn" id="textboxBtn" title="Textbox (T)" data-tool="textbox">📝 Text</button>
+                <button class="tool-btn" id="stickyBtn" title="Sticky note (S)" data-tool="sticky">📌 Note</button>
+            </div>
+
+            <div class="toolbar-section">
+                <div class="pill-switch">
+                    <button id="pixelEraserMode" class="active">Pixel</button>
+                    <button id="strokeEraserMode">Stroke</button>
+                </div>
+            </div>
+
+            <div class="toolbar-section">
+                <label style="font-size: 12px;">Stroke:</label>
+                <input type="range" id="strokeWidth" min="1" max="30" value="2" title="Stroke width">
+                <span id="strokeWidthDisplay">2px</span>
+            </div>
+
+            <div class="toolbar-section">
+                <label style="font-size: 12px;">Color:</label>
+                <input type="color" id="colorPicker" value="#000000" title="Stroke color">
+            </div>
+
+            <div class="toolbar-section">
+                <button id="undoBtn" title="Undo (Z)">↶ Undo</button>
+                <button id="redoBtn" title="Redo (Y)">↷ Redo</button>
+                <button id="clearPageBtn" title="Clear page">🗑️ Clear</button>
+            </div>
+
+            <div class="toolbar-section">
+                <button id="saveBtn" title="Save annotations">💾 Save</button>
+                <button id="exportBtn" title="Export JSON">📥 Export</button>
+                <button id="importBtn" title="Import JSON">📤 Import</button>
+            </div>
+
+            <div class="toolbar-section">
+                <label style="font-size: 12px;">Zoom:</label>
+                <button id="zoomOutBtn">−</button>
+                <span id="zoomDisplay">100%</span>
+                <button id="zoomInBtn">+</button>
+                <button id="fitPageBtn">Fit</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content-wrapper">
+            <!-- Sidebar -->
+            <div class="sidebar" id="sidebar">
+                <div id="thumbnailsContainer"></div>
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="canvas-container">
+                <div class="canvas-wrapper" id="canvasWrapper">
+                    <div id="pagesContainer"></div>
+                </div>
+                <div class="status-bar">
+                    <div class="status-item">
+                        <span id="pageInfo">No PDF loaded</span>
+                    </div>
+                    <div class="status-item">
+                        <span id="fileInfo"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formatting Toolbar (Dynamic) -->
+    <div class="formatting-toolbar" id="formattingToolbar" style="display: none;"></div>
+
+    <!-- Import Modal -->
+    <div class="modal" id="importModal">
+        <div class="modal-content">
+            <div class="modal-title">Import Annotations</div>
+            <textarea id="importJSON" style="width: 100%; height: 200px; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; font-family: monospace; font-size: 12px;"></textarea>
+            <div class="modal-actions">
+                <button id="cancelImportBtn">Cancel</button>
+                <button id="confirmImportBtn">Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div class="loading-indicator" id="loadingIndicator">
+        <div class="spinner"></div>
+        <span>Loading PDF...</span>
+    </div>
+
+    <!-- Hidden file input for import -->
+    <input type="file" id="importFileInput" accept=".json" style="display: none;">
+
+    <script>
+        // PDF.js Setup
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // ============================================================================
+        // STATE MANAGEMENT
+        // ============================================================================
+        const state = {
+            pdf: null,
+            currentPage: 1,
+            totalPages: 0,
+            zoom: 1,
+            pdfName: '',
+            currentTool: 'pen',
+            strokeWidth: 2,
+            strokeColor: '#000000',
+            eraserMode: 'pixel', // 'pixel' or 'stroke'
+            isDrawing: false,
+            annotations: {}, // { pageNum: { strokes: [], textboxes: [], stickyNotes: [] } }
+            history: [], // undo/redo
+            historyIndex: -1,
+            devicePixelRatio: window.devicePixelRatio || 1,
+            selectedTextbox: null,
+            resizingTextbox: null,
+            resizeDirection: null,
+            draggingTextbox: null,
+            draggingSticky: null,
+            canvases: {}, // { pageNum: { pdfCanvas, annotationCanvas } }
+            pages: {}, // { pageNum: { width, height, scale } }
+        };
+
+        // ============================================================================
+        // UI ELEMENTS
+        // ============================================================================
+        const elements = {
+            openBtn: document.getElementById('openBtn'),
+            pdfInput: document.getElementById('pdfInput'),
+            sidebarToggle: document.getElementById('sidebarToggle'),
+            sidebar: document.getElementById('sidebar'),
+            canvasWrapper: document.getElementById('canvasWrapper'),
+            pagesContainer: document.getElementById('pagesContainer'),
+            thumbnailsContainer: document.getElementById('thumbnailsContainer'),
+            
+            // Tool buttons
+            penBtn: document.getElementById('penBtn'),
+            pencilBtn: document.getElementById('pencilBtn'),
+            highlighterBtn: document.getElementById('highlighterBtn'),
+            eraserBtn: document.getElementById('eraserBtn'),
+            textboxBtn: document.getElementById('textboxBtn'),
+            stickyBtn: document.getElementById('stickyBtn'),
+            
+            // Eraser mode
+            pixelEraserMode: document.getElementById('pixelEraserMode'),
+            strokeEraserMode: document.getElementById('strokeEraserMode'),
+            
+            // Drawing controls
+            strokeWidth: document.getElementById('strokeWidth'),
+            strokeWidthDisplay: document.getElementById('strokeWidthDisplay'),
+            colorPicker: document.getElementById('colorPicker'),
+            
+            // Editing
+            undoBtn: document.getElementById('undoBtn'),
+            redoBtn: document.getElementById('redoBtn'),
+            clearPageBtn: document.getElementById('clearPageBtn'),
+            
+            // File operations
+            saveBtn: document.getElementById('saveBtn'),
+            exportBtn: document.getElementById('exportBtn'),
+            importBtn: document.getElementById('importBtn'),
+            
+            // Zoom
+            zoomOutBtn: document.getElementById('zoomOutBtn'),
+            zoomInBtn: document.getElementById('zoomInBtn'),
+            zoomDisplay: document.getElementById('zoomDisplay'),
+            fitPageBtn: document.getElementById('fitPageBtn'),
+            
+            // Status
+            pageInfo: document.getElementById('pageInfo'),
+            fileInfo: document.getElementById('fileInfo'),
+            
+            // Formatting toolbar
+            formattingToolbar: document.getElementById('formattingToolbar'),
+            
+            // Modal
+            importModal: document.getElementById('importModal'),
+            importJSON: document.getElementById('importJSON'),
+            cancelImportBtn: document.getElementById('cancelImportBtn'),
+            confirmImportBtn: document.getElementById('confirmImportBtn'),
+            importFileInput: document.getElementById('importFileInput'),
+            
+            // Loading
+            loadingIndicator: document.getElementById('loadingIndicator'),
+        };
+
+        // ============================================================================
+        // UTILITY FUNCTIONS
+        // ============================================================================
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function normalizeCoordinate(screenX, pageNum) {
+            const page = state.pages[pageNum];
+            if (!page) return 0;
+            const normalizedValue = screenX / (page.width * state.zoom);
+            return Math.max(0, Math.min(1, normalizedValue));
+        }
+
+        function denormalizeCoordinate(normX, normY, pageNum) {
+            const page = state.pages[pageNum];
+            if (!page) return { x: 0, y: 0 };
+            return {
+                x: normX * page.width * state.zoom,
+                y: normY * page.height * state.zoom
+            };
+        }
+
+        function screenToNormalized(screenX, screenY, pageNum) {
+            const page = state.pages[pageNum];
+            if (!page) return { x: 0, y: 0 };
+            return {
+                x: Math.max(0, Math.min(1, screenX / (page.width * state.zoom))),
+                y: Math.max(0, Math.min(1, screenY / (page.height * state.zoom)))
+            };
+        }
+
+        function normalizedToScreen(normX, normY, pageNum) {
+            const page = state.pages[pageNum];
+            if (!page) return { x: 0, y: 0 };
+            return {
+                x: normX * page.width * state.zoom,
+                y: normY * page.height * state.zoom
+            };
+        }
+
+        function showLoading(show) {
+            elements.loadingIndicator.classList.toggle('active', show);
+        }
+
+        function setActiveTool(tool) {
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tool + 'Btn')?.classList.add('active');
+            state.currentTool = tool;
+        }
+
+        function updateZoomDisplay() {
+            elements.zoomDisplay.textContent = Math.round(state.zoom * 100) + '%';
+        }
+
+        function updatePageInfo() {
+            if (state.pdf) {
+                elements.pageInfo.textContent = `Page ${state.currentPage} of ${state.totalPages}`;
+                elements.fileInfo.textContent = state.pdfName;
+            }
+        }
+
+        // ============================================================================
+        // PDF LOADING
+        // ============================================================================
+        async function loadPDF(file) {
+            showLoading(true);
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                state.pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                state.totalPages = state.pdf.numPages;
+                state.pdfName = file.name;
+                state.currentPage = 1;
+                state.zoom = 1;
+                
+                // Load saved annotations
+                loadAnnotations();
+                
+                // Render pages
+                await renderAllPages();
+                updatePageInfo();
+                renderThumbnails();
+                
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                alert('Error loading PDF file');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function renderAllPages() {
+            elements.pagesContainer.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            
+            for (let i = 1; i <= Math.min(state.totalPages, 10); i++) {
+                const page = await state.pdf.getPage(i);
+                const viewport = page.getViewport({ scale: state.zoom });
+                
+                state.pages[i] = {
+                    width: viewport.width,
+                    height: viewport.height,
+                    scale: state.zoom,
+                    originalWidth: page.view[2],
+                    originalHeight: page.view[3]
+                };
+                
+                const pageContainer = createPageContainer(i, viewport.width, viewport.height);
+                fragment.appendChild(pageContainer);
+                
+                renderPage(page, i, viewport);
+            }
+            
+            elements.pagesContainer.appendChild(fragment);
+        }
+
+        function createPageContainer(pageNum, width, height) {
+            const container = document.createElement('div');
+            container.className = 'page-container';
+            container.id = `page-${pageNum}`;
+            container.style.width = width + 'px';
+            container.style.height = height + 'px';
+            
+            // PDF Canvas
+            const pdfCanvas = document.createElement('canvas');
+            pdfCanvas.width = width;
+            pdfCanvas.height = height;
+            
+            // Annotation Canvas
+            const annotationCanvas = document.createElement('canvas');
+            annotationCanvas.className = 'annotation-canvas';
+            annotationCanvas.width = width;
+            annotationCanvas.height = height;
+            annotationCanvas.id = `annotation-canvas-${pageNum}`;
+            
+            // Textbox Layer
+            const textboxLayer = document.createElement('div');
+            textboxLayer.className = 'textbox-layer';
+            textboxLayer.id = `textbox-layer-${pageNum}`;
+            
+            container.appendChild(pdfCanvas);
+            container.appendChild(annotationCanvas);
+            container.appendChild(textboxLayer);
+            
+            state.canvases[pageNum] = {
+                pdfCanvas,
+                annotationCanvas
+            };
+            
+            // Event listeners
+            annotationCanvas.addEventListener('mousedown', (e) => handleCanvasMouseDown(e, pageNum));
+            annotationCanvas.addEventListener('mousemove', (e) => handleCanvasMouseMove(e, pageNum));
+            annotationCanvas.addEventListener('mouseup', (e) => handleCanvasMouseUp(e, pageNum));
+            annotationCanvas.addEventListener('touchstart', (e) => handleCanvasMouseDown(e, pageNum));
+            annotationCanvas.addEventListener('touchmove', (e) => handleCanvasMouseMove(e, pageNum));
+            annotationCanvas.addEventListener('touchend', (e) => handleCanvasMouseUp(e, pageNum));
+            
+            textboxLayer.addEventListener('click', (e) => handleTextboxLayerClick(e, pageNum));
+            
+            return container;
+        }
+
+        async function renderPage(page, pageNum, viewport) {
+            const canvas = state.canvases[pageNum].pdfCanvas;
+            const context = canvas.getContext('2d');
+            
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+            
+            // Redraw annotations
+            redrawAnnotations(pageNum);
+        }
+
+        async function renderThumbnails() {
+            elements.thumbnailsContainer.innerHTML = '';
+            for (let i = 1; i <= state.totalPages; i++) {
+                const page = await state.pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 0.25 });
+                
+                const thumbnail = document.createElement('div');
+                thumbnail.className = 'thumbnail';
+                if (i === state.currentPage) thumbnail.classList.add('active');
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                
+                await page.render({
+                    canvasContext: canvas.getContext('2d'),
+                    viewport: viewport
+                }).promise;
+                
+                thumbnail.appendChild(canvas);
+                thumbnail.addEventListener('click', () => goToPage(i));
+                elements.thumbnailsContainer.appendChild(thumbnail);
+            }
+        }
+
+        function goToPage(pageNum) {
+            if (pageNum < 1 || pageNum > state.totalPages) return;
+            state.currentPage = pageNum;
+            updatePageInfo();
+            
+            document.querySelectorAll('.thumbnail').forEach((t, i) => {
+                t.classList.toggle('active', i + 1 === pageNum);
+            });
+            
+            const page = document.getElementById(`page-${pageNum}`);
+            if (page) {
+                page.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // ============================================================================
+        // DRAWING ENGINE
+        // ============================================================================
+        function getCanvasCoordinates(e, pageNum) {
+            const canvas = state.canvases[pageNum].annotationCanvas;
+            const rect = canvas.getBoundingClientRect();
+            
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+            
+            return { x, y };
+        }
+
+        function addStroke(pageNum, points, tool, width, color) {
+            if (!state.annotations[pageNum]) {
+                state.annotations[pageNum] = { strokes: [], textboxes: [], stickyNotes: [] };
+            }
+            
+            state.annotations[pageNum].strokes.push({
+                id: generateUUID(),
+                points,
+                tool,
+                width,
+                color,
+                timestamp: Date.now()
+            });
+        }
+
+        function drawStroke(context, points, tool, width, color) {
+            if (points.length < 2) return;
+            
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+            context.lineWidth = width;
+            context.strokeStyle = color;
+            
+            if (tool === 'pencil') {
+                context.globalAlpha = 0.7;
+            } else if (tool === 'highlighter') {
+                context.globalAlpha = 0.4;
+                context.lineWidth = 20;
+                context.globalCompositeOperation = 'multiply';
+                context.strokeStyle = '#ffff00';
+            } else {
+                context.globalAlpha = 1;
+                context.globalCompositeOperation = 'source-over';
+            }
+            
+            context.beginPath();
+            
+            // Apply smooth curve
+            for (let i = 0; i < points.length; i++) {
+                const point = points[i];
+                
+                if (tool === 'pencil' && i > 0) {
+                    const offset = {
+                        x: (Math.random() - 0.5) * 2,
+                        y: (Math.random() - 0.5) * 2
+                    };
+                    context.lineTo(point.x + offset.x, point.y + offset.y);
+                } else {
+                    if (i === 0) {
+                        context.moveTo(point.x, point.y);
+                    } else {
+                        context.lineTo(point.x, point.y);
+                    }
+                }
+            }
+            
+            context.stroke();
+            context.globalAlpha = 1;
+            context.globalCompositeOperation = 'source-over';
+        }
+
+        function redrawAnnotations(pageNum) {
+            const canvas = state.canvases[pageNum].annotationCanvas;
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const page = state.annotations[pageNum];
+            if (!page) return;
+            
+            // Draw strokes
+            page.strokes.forEach(stroke => {
+                drawStroke(context, stroke.points, stroke.tool, stroke.width, stroke.color);
+            });
+        }
+
+        function handleCanvasMouseDown(e, pageNum) {
+            if (e.target !== state.canvases[pageNum].annotationCanvas) return;
+            
+            const coords = getCanvasCoordinates(e, pageNum);
+            
+            if (state.currentTool === 'eraser' && state.eraserMode === 'stroke') {
+                handleStrokeErase(pageNum, coords);
+                return;
+            }
+            
+            if (state.currentTool === 'textbox') {
+                createTextbox(pageNum, coords);
+                return;
+            }
+            
+            if (state.currentTool === 'sticky') {
+                createStickyNote(pageNum, coords);
+                return;
+            }
+            
+            state.isDrawing = true;
+            state.currentPage = pageNum;
+            
+            if (state.currentTool === 'eraser' && state.eraserMode === 'pixel') {
+                state.erasingPoints = [coords];
+            } else {
+                state.drawingPoints = [coords];
+            }
+        }
+
+        function handleCanvasMouseMove(e, pageNum) {
+            if (!state.isDrawing) return;
+            
+            const coords = getCanvasCoordinates(e, pageNum);
+            
+            if (state.currentTool === 'eraser' && state.eraserMode === 'pixel') {
+                state.erasingPoints.push(coords);
+                erasePixels(pageNum, coords);
+            } else if (state.currentTool !== 'textbox' && state.currentTool !== 'sticky') {
+                state.drawingPoints.push(coords);
+                
+                // Draw on canvas
+                const canvas = state.canvases[pageNum].annotationCanvas;
+                const context = canvas.getContext('2d');
+                
+                if (state.drawingPoints.length > 1) {
+                    const lastPoint = state.drawingPoints[state.drawingPoints.length - 2];
+                    const currentPoint = state.drawingPoints[state.drawingPoints.length - 1];
+                    
+                    context.lineCap = 'round';
+                    context.lineJoin = 'round';
+                    context.lineWidth = state.strokeWidth;
+                    context.strokeStyle = state.strokeColor;
+                    
+                    if (state.currentTool === 'pencil') {
+                        context.globalAlpha = 0.7;
+                    } else if (state.currentTool === 'highlighter') {
+                        context.globalAlpha = 0.4;
+                        context.lineWidth = 20;
+                        context.globalCompositeOperation = 'multiply';
+                        context.strokeStyle = '#ffff00';
+                    } else {
+                        context.globalAlpha = 1;
+                        context.globalCompositeOperation = 'source-over';
+                    }
+                    
+                    context.beginPath();
+                    context.moveTo(lastPoint.x, lastPoint.y);
+                    
+                    if (state.currentTool === 'pencil') {
+                        const offset = {
+                            x: (Math.random() - 0.5) * 2,
+                            y: (Math.random() - 0.5) * 2
+                        };
+                        context.lineTo(currentPoint.x + offset.x, currentPoint.y + offset.y);
+                    } else {
+                        context.lineTo(currentPoint.x, currentPoint.y);
+                    }
+                    
+                    context.stroke();
+                    context.globalAlpha = 1;
+                    context.globalCompositeOperation = 'source-over';
+                }
+            }
+        }
+
+        function handleCanvasMouseUp(e, pageNum) {
+            if (!state.isDrawing) return;
+            state.isDrawing = false;
+            
+            if (state.drawingPoints && state.drawingPoints.length > 1) {
+                addStroke(
+                    state.currentPage,
+                    state.drawingPoints,
+                    state.currentTool,
+                    state.strokeWidth,
+                    state.strokeColor
+                );
+                pushHistory();
+                state.drawingPoints = [];
+            }
+            
+            state.erasingPoints = [];
+        }
+
+        // ============================================================================
+        // ERASER
+        // ============================================================================
+        function erasePixels(pageNum, coords) {
+            const canvas = state.canvases[pageNum].annotationCanvas;
+            const context = canvas.getContext('2d');
+            const eraserSize = state.strokeWidth * 2;
+            
+            context.globalCompositeOperation = 'destination-out';
+            context.fillStyle = 'rgba(0,0,0,1)';
+            context.beginPath();
+            context.arc(coords.x, coords.y, eraserSize, 0, Math.PI * 2);
+            context.fill();
+            context.globalCompositeOperation = 'source-over';
+        }
+
+        function handleStrokeErase(pageNum, coords) {
+            const page = state.annotations[pageNum];
+            if (!page || !page.strokes.length) return;
+            
+            // Find stroke under cursor
+            for (let i = page.strokes.length - 1; i >= 0; i--) {
+                const stroke = page.strokes[i];
+                const hitRadius = 10;
+                
+                for (const point of stroke.points) {
+                    if (Math.hypot(point.x - coords.x, point.y - coords.y) < hitRadius) {
+                        page.strokes.splice(i, 1);
+                        redrawAnnotations(pageNum);
+                        pushHistory();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // ============================================================================
+        // TEXTBOX SYSTEM
+        // ============================================================================
+        function createTextbox(pageNum, coords) {
+            if (!state.annotations[pageNum]) {
+                state.annotations[pageNum] = { strokes: [], textboxes: [], stickyNotes: [] };
+            }
+            
+            const canvas = state.canvases[pageNum].annotationCanvas;
+            const layer = document.getElementById(`textbox-layer-${pageNum}`);
+            const page = state.pages[pageNum];
+            
+            // Convert screen coordinates to normalized (0-1 range)
+            const normalized = screenToNormalized(coords.x, coords.y, pageNum);
+            
+            const textbox = {
+                id: generateUUID(),
+                page: pageNum,
+                x: normalized.x,
+                y: normalized.y,
+                width: 0.25,
+                height: 0.08,
+                text: 'Edit text...',
+                color: '#000000',
+                fontSize: 14,
+                fontFamily: 'Helvetica',
+                bold: false,
+                italic: false,
+                underline: false,
+                rotation: 0,
+                createdAt: new Date().toISOString()
+            };
+            
+            state.annotations[pageNum].textboxes.push(textbox);
+            renderTextbox(pageNum, textbox, layer);
+            pushHistory();
+        }
+
+        function renderTextbox(pageNum, textbox, layer) {
+            const page = state.pages[pageNum];
+            const textboxEl = document.createElement('div');
+            textboxEl.className = 'textbox';
+            textboxEl.id = `textbox-${textbox.id}`;
+            
+            // Convert normalized coordinates to screen coordinates
+            const screenPos = normalizedToScreen(textbox.x, textbox.y, pageNum);
+            const screenW = textbox.width * page.width * state.zoom;
+            const screenH = textbox.height * page.height * state.zoom;
+            
+            textboxEl.style.left = screenPos.x + 'px';
+            textboxEl.style.top = screenPos.y + 'px';
+            textboxEl.style.width = screenW + 'px';
+            textboxEl.style.minHeight = screenH + 'px';
+            textboxEl.style.color = textbox.color;
+            textboxEl.style.fontSize = textbox.fontSize + 'px';
+            textboxEl.style.fontFamily = textbox.fontFamily;
+            textboxEl.style.fontWeight = textbox.bold ? 'bold' : 'normal';
+            textboxEl.style.fontStyle = textbox.italic ? 'italic' : 'normal';
+            textboxEl.style.textDecoration = textbox.underline ? 'underline' : 'none';
+            
+            const content = document.createElement('div');
+            content.className = 'textbox-content';
+            content.contentEditable = true;
+            content.textContent = textbox.text;
+            
+            // Handles
+            const handles = ['nw', 'ne', 'sw', 'se', 'n', 's', 'w', 'e'];
+            handles.forEach(pos => {
+                const handle = document.createElement('div');
+                handle.className = `textbox-handle ${pos}`;
+                textboxEl.appendChild(handle);
+            });
+            
+            textboxEl.appendChild(content);
+            layer.appendChild(textboxEl);
+            
+            // Event listeners
+            textboxEl.addEventListener('click', (e) => selectTextbox(textboxEl, pageNum, textbox, e));
+            textboxEl.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                enterEditMode(content);
+            });
+            textboxEl.addEventListener('mousedown', (e) => handleTextboxMouseDown(e, pageNum, textbox, textboxEl));
+            content.addEventListener('input', () => updateTextboxData(pageNum, textbox, content));
+            content.addEventListener('blur', () => saveTextboxState(pageNum, textbox));
+            
+            selectTextbox(textboxEl, pageNum, textbox);
+        }
+
+        function selectTextbox(el, pageNum, textbox, e) {
+            if (e) e.stopPropagation();
+            document.querySelectorAll('.textbox').forEach(t => t.classList.remove('selected'));
+            el.classList.add('selected');
+            state.selectedTextbox = { el, pageNum, data: textbox };
+            showFormattingToolbar(textbox);
+        }
+
+        function enterEditMode(contentEl) {
+            contentEl.focus();
+            const range = document.createRange();
+            range.selectNodeContents(contentEl);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+
+        function handleTextboxMouseDown(e, pageNum, textbox, textboxEl) {
+            e.stopPropagation();
+            
+            if (e.target.classList.contains('textbox-handle')) {
+                const rect = textboxEl.getBoundingClientRect();
+                state.resizingTextbox = {
+                    pageNum,
+                    textbox,
+                    textboxEl,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    startWidth: parseFloat(textboxEl.style.width),
+                    startHeight: parseFloat(textboxEl.style.minHeight),
+                    startLeft: parseFloat(textboxEl.style.left),
+                    startTop: parseFloat(textboxEl.style.top)
+                };
+                state.resizeDirection = e.target.className.split(' ')[1];
+                
+                const handleResize = (moveEvent) => {
+                    if (!state.resizingTextbox) return;
+                    
+                    const { pageNum, textbox, textboxEl } = state.resizingTextbox;
+                    const page = state.pages[pageNum];
+                    
+                    const deltaX = moveEvent.clientX - state.resizingTextbox.startX;
+                    const deltaY = moveEvent.clientY - state.resizingTextbox.startY;
+                    const direction = state.resizeDirection;
+                    
+                    let newLeft = state.resizingTextbox.startLeft;
+                    let newTop = state.resizingTextbox.startTop;
+                    let newWidth = state.resizingTextbox.startWidth;
+                    let newHeight = state.resizingTextbox.startHeight;
+                    
+                    if (direction.includes('e')) {
+                        newWidth = Math.max(50, state.resizingTextbox.startWidth + deltaX);
+                    }
+                    if (direction.includes('w')) {
+                        newWidth = Math.max(50, state.resizingTextbox.startWidth - deltaX);
+                        newLeft = state.resizingTextbox.startLeft + deltaX;
+                    }
+                    if (direction.includes('s')) {
+                        newHeight = Math.max(30, state.resizingTextbox.startHeight + deltaY);
+                    }
+                    if (direction.includes('n')) {
+                        newHeight = Math.max(30, state.resizingTextbox.startHeight - deltaY);
+                        newTop = state.resizingTextbox.startTop + deltaY;
+                    }
+                    
+                    textboxEl.style.left = newLeft + 'px';
+                    textboxEl.style.top = newTop + 'px';
+                    textboxEl.style.width = newWidth + 'px';
+                    textboxEl.style.minHeight = newHeight + 'px';
+                    
+                    // Update normalized coordinates
+                    const normPos = screenToNormalized(newLeft, newTop, pageNum);
+                    textbox.x = normPos.x;
+                    textbox.y = normPos.y;
+                    textbox.width = newWidth / (page.width * state.zoom);
+                    textbox.height = newHeight / (page.height * state.zoom);
+                };
+                
+                const stopResize = () => {
+                    document.removeEventListener('mousemove', handleResize);
+                    document.removeEventListener('mouseup', stopResize);
+                    state.resizingTextbox = null;
+                    pushHistory();
+                };
+                
+                document.addEventListener('mousemove', handleResize);
+                document.addEventListener('mouseup', stopResize);
+            } else if (!e.target.classList.contains('textbox-content')) {
+                state.draggingTextbox = {
+                    pageNum,
+                    textbox,
+                    textboxEl,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    startLeft: parseFloat(textboxEl.style.left),
+                    startTop: parseFloat(textboxEl.style.top)
+                };
+                
+                const handleDrag = (moveEvent) => {
+                    if (!state.draggingTextbox) return;
+                    
+                    const { pageNum, textbox, textboxEl } = state.draggingTextbox;
+                    const page = state.pages[pageNum];
+                    
+                    const deltaX = moveEvent.clientX - state.draggingTextbox.startX;
+                    const deltaY = moveEvent.clientY - state.draggingTextbox.startY;
+                    
+                    const newLeft = state.draggingTextbox.startLeft + deltaX;
+                    const newTop = state.draggingTextbox.startTop + deltaY;
+                    
+                    textboxEl.style.left = newLeft + 'px';
+                    textboxEl.style.top = newTop + 'px';
+                    
+                    // Update normalized coordinates
+                    const normalized = screenToNormalized(newLeft, newTop, pageNum);
+                    textbox.x = normalized.x;
+                    textbox.y = normalized.y;
+                };
+                
+                const stopDrag = () => {
+                    document.removeEventListener('mousemove', handleDrag);
+                    document.removeEventListener('mouseup', stopDrag);
+                    state.draggingTextbox = null;
+                    pushHistory();
+                };
+                
+                document.addEventListener('mousemove', handleDrag);
+                document.addEventListener('mouseup', stopDrag);
+            }
+        }
+
+        function updateTextboxData(pageNum, textbox, contentEl) {
+            textbox.text = contentEl.textContent;
+        }
+
+        function saveTextboxState(pageNum, textbox) {
+            pushHistory();
+        }
+
+        function showFormattingToolbar(textbox) {
+            const toolbar = elements.formattingToolbar;
+            toolbar.innerHTML = '';
+            toolbar.style.display = 'flex';
+            
+            // Font family
+            const fontSelect = document.createElement('select');
+            fontSelect.innerHTML = `
+                <option value="Helvetica">Helvetica</option>
+                <option value="Arial">Arial</option>
+                <option value="Times New Roman">Times</option>
+                <option value="Courier">Courier</option>
+                <option value="Georgia">Georgia</option>
+            `;
+            fontSelect.value = textbox.fontFamily;
+            fontSelect.addEventListener('change', (e) => {
+                textbox.fontFamily = e.target.value;
+                updateTextboxStyling();
+            });
+            toolbar.appendChild(fontSelect);
+            
+            // Font size
+            const sizeInput = document.createElement('input');
+            sizeInput.type = 'number';
+            sizeInput.value = textbox.fontSize;
+            sizeInput.min = 8;
+            sizeInput.max = 72;
+            sizeInput.addEventListener('change', (e) => {
+                textbox.fontSize = parseInt(e.target.value);
+                updateTextboxStyling();
+            });
+            toolbar.appendChild(sizeInput);
+            
+            // Bold
+            const boldBtn = document.createElement('button');
+            boldBtn.textContent = 'B';
+            boldBtn.style.fontWeight = 'bold';
+            if (textbox.bold) boldBtn.classList.add('active');
+            boldBtn.addEventListener('click', () => {
+                textbox.bold = !textbox.bold;
+                boldBtn.classList.toggle('active');
+                updateTextboxStyling();
+            });
+            toolbar.appendChild(boldBtn);
+            
+            // Italic
+            const italicBtn = document.createElement('button');
+            italicBtn.textContent = 'I';
+            italicBtn.style.fontStyle = 'italic';
+            if (textbox.italic) italicBtn.classList.add('active');
+            italicBtn.addEventListener('click', () => {
+                textbox.italic = !textbox.italic;
+                italicBtn.classList.toggle('active');
+                updateTextboxStyling();
+            });
+            toolbar.appendChild(italicBtn);
+            
+            // Underline
+            const underlineBtn = document.createElement('button');
+            underlineBtn.textContent = 'U';
+            underlineBtn.style.textDecoration = 'underline';
+            if (textbox.underline) underlineBtn.classList.add('active');
+            underlineBtn.addEventListener('click', () => {
+                textbox.underline = !textbox.underline;
+                underlineBtn.classList.toggle('active');
+                updateTextboxStyling();
+            });
+            toolbar.appendChild(underlineBtn);
+            
+            // Color
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = textbox.color;
+            colorInput.addEventListener('change', (e) => {
+                textbox.color = e.target.value;
+                updateTextboxStyling();
+            });
+            toolbar.appendChild(colorInput);
+            
+            function updateTextboxStyling() {
+                if (state.selectedTextbox) {
+                    const el = state.selectedTextbox.el;
+                    el.style.fontFamily = textbox.fontFamily;
+                    el.style.fontSize = textbox.fontSize + 'px';
+                    el.style.fontWeight = textbox.bold ? 'bold' : 'normal';
+                    el.style.fontStyle = textbox.italic ? 'italic' : 'normal';
+                    el.style.textDecoration = textbox.underline ? 'underline' : 'none';
+                    el.style.color = textbox.color;
+                    pushHistory();
+                }
+            }
+        }
+
+        function handleTextboxLayerClick(e, pageNum) {
+            // Deselect textboxes if clicking on empty area
+            if (e.target.classList.contains('textbox-layer')) {
+                document.querySelectorAll('.textbox').forEach(t => t.classList.remove('selected'));
+                state.selectedTextbox = null;
+                elements.formattingToolbar.style.display = 'none';
+            }
+        }
+
+        // ============================================================================
+        // STICKY NOTES
+        // ============================================================================
+        function createStickyNote(pageNum, coords) {
+            if (!state.annotations[pageNum]) {
+                state.annotations[pageNum] = { strokes: [], textboxes: [], stickyNotes: [] };
+            }
+            
+            const layer = document.getElementById(`textbox-layer-${pageNum}`);
+            
+            const stickyNote = {
+                id: generateUUID(),
+                page: pageNum,
+                x: coords.x,
+                y: coords.y,
+                text: '',
+                createdAt: new Date().toISOString()
+            };
+            
+            state.annotations[pageNum].stickyNotes.push(stickyNote);
+            renderStickyNote(pageNum, stickyNote, layer);
+            pushHistory();
+        }
+
+        function renderStickyNote(pageNum, stickyNote, layer) {
+            const noteEl = document.createElement('div');
+            noteEl.className = 'sticky-note';
+            noteEl.id = `sticky-${stickyNote.id}`;
+            noteEl.style.left = stickyNote.x + 'px';
+            noteEl.style.top = stickyNote.y + 'px';
+            
+            const header = document.createElement('div');
+            header.className = 'sticky-note-header';
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'sticky-note-delete';
+            deleteBtn.textContent = '✕';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                state.annotations[pageNum].stickyNotes = state.annotations[pageNum].stickyNotes.filter(n => n.id !== stickyNote.id);
+                noteEl.remove();
+                pushHistory();
+            });
+            
+            header.appendChild(deleteBtn);
+            
+            const content = document.createElement('textarea');
+            content.className = 'sticky-note-content';
+            content.value = stickyNote.text;
+            content.addEventListener('input', () => {
+                stickyNote.text = content.value;
+            });
+            
+            noteEl.appendChild(header);
+            noteEl.appendChild(content);
+            layer.appendChild(noteEl);
+            
+            // Make draggable
+            makeElementDraggable(noteEl, pageNum, stickyNote);
+        }
+
+        function makeElementDraggable(el, pageNum, data) {
+            let offsetX = 0;
+            let offsetY = 0;
+            
+            el.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('sticky-note-delete') || e.target.classList.contains('sticky-note-content')) {
+                    return;
+                }
+                
+                offsetX = e.clientX - el.offsetLeft;
+                offsetY = e.clientY - el.offsetTop;
+                
+                el.style.zIndex = 51;
+                
+                const mousemove = (moveE) => {
+                    el.style.left = (moveE.clientX - offsetX) + 'px';
+                    el.style.top = (moveE.clientY - offsetY) + 'px';
+                    data.x = moveE.clientX - offsetX;
+                    data.y = moveE.clientY - offsetY;
+                };
+                
+                const mouseup = () => {
+                    el.style.zIndex = 50;
+                    document.removeEventListener('mousemove', mousemove);
+                    document.removeEventListener('mouseup', mouseup);
+                    pushHistory();
+                };
+                
+                document.addEventListener('mousemove', mousemove);
+                document.addEventListener('mouseup', mouseup);
+            });
+        }
+
+        // ============================================================================
+        // UNDO/REDO
+        // ============================================================================
+        function pushHistory() {
+            state.historyIndex++;
+            state.history = state.history.slice(0, state.historyIndex);
+            state.history.push(JSON.parse(JSON.stringify(state.annotations)));
+            updateHistoryButtons();
+            
+            // Debounce save
+            clearTimeout(state.saveTimeout);
+            state.saveTimeout = setTimeout(saveAnnotations, 500);
+        }
+
+        function undo() {
+            if (state.historyIndex > 0) {
+                state.historyIndex--;
+                state.annotations = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+                redrawAllAnnotations();
+                updateHistoryButtons();
+            }
+        }
+
+        function redo() {
+            if (state.historyIndex < state.history.length - 1) {
+                state.historyIndex++;
+                state.annotations = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+                redrawAllAnnotations();
+                updateHistoryButtons();
+            }
+        }
+
+        function updateHistoryButtons() {
+            elements.undoBtn.disabled = state.historyIndex <= 0;
+            elements.redoBtn.disabled = state.historyIndex >= state.history.length - 1;
+        }
+
+        function redrawAllAnnotations() {
+            for (let i = 1; i <= Math.min(state.totalPages, 10); i++) {
+                redrawAnnotations(i);
+                
+                // Redraw textboxes
+                const layer = document.getElementById(`textbox-layer-${i}`);
+                if (layer) {
+                    const page = state.annotations[i];
+                    layer.innerHTML = '';
+                    if (page && page.textboxes) {
+                        page.textboxes.forEach(tb => renderTextbox(i, tb, layer));
+                    }
+                    if (page && page.stickyNotes) {
+                        page.stickyNotes.forEach(sn => renderStickyNote(i, sn, layer));
+                    }
+                }
+            }
+        }
+
+        // ============================================================================
+        // SAVE/RESTORE
+        // ============================================================================
+        function saveAnnotations() {
+            if (!state.pdfName) return;
+            
+            const data = {
+                pdfName: state.pdfName,
+                annotations: state.annotations,
+                savedAt: new Date().toISOString()
+            };
+            
+            localStorage.setItem(`accoly_${state.pdfName}`, JSON.stringify(data));
+        }
+
+        function loadAnnotations() {
+            if (!state.pdfName) return;
+            
+            const stored = localStorage.getItem(`accoly_${state.pdfName}`);
+            if (stored) {
+                try {
+                    const data = JSON.parse(stored);
+                    state.annotations = data.annotations || {};
+                } catch (e) {
+                    console.error('Error loading annotations:', e);
+                }
+            }
+        }
+
+        function exportAnnotations() {
+            const data = {
+                pdfName: state.pdfName,
+                totalPages: state.totalPages,
+                annotations: state.annotations,
+                exportedAt: new Date().toISOString()
+            };
+            
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${state.pdfName.replace('.pdf', '')}_annotations.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importAnnotations(json) {
+            try {
+                const data = JSON.parse(json);
+                state.annotations = data.annotations || {};
+                redrawAllAnnotations();
+                pushHistory();
+            } catch (e) {
+                alert('Invalid JSON format');
+            }
+        }
+
+        // ============================================================================
+        // ZOOM
+        // ============================================================================
+        function setZoom(factor) {
+            state.zoom = Math.max(0.5, Math.min(3, factor));
+            renderAllPages();
+            updateZoomDisplay();
+        }
+
+        function zoomIn() {
+            setZoom(state.zoom + 0.1);
+        }
+
+        function zoomOut() {
+            setZoom(state.zoom - 0.1);
+        }
+
+        function fitPage() {
+            const wrapper = elements.canvasWrapper;
+            const container = document.querySelector('.page-container');
+            if (container) {
+                const ratio = wrapper.clientWidth / container.offsetWidth;
+                setZoom(ratio * 0.9);
+            }
+        }
+
+        // ============================================================================
+        // EVENT LISTENERS
+        // ============================================================================
+        elements.openBtn.addEventListener('click', () => elements.pdfInput.click());
+        elements.pdfInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                loadPDF(e.target.files[0]);
+            }
+        });
+
+        elements.sidebarToggle.addEventListener('click', () => {
+            elements.sidebar.classList.toggle('hidden');
+        });
+
+        // Tool buttons
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setActiveTool(btn.dataset.tool);
+            });
+        });
+
+        // Eraser mode
+        elements.pixelEraserMode.addEventListener('click', () => {
+            state.eraserMode = 'pixel';
+            elements.pixelEraserMode.classList.add('active');
+            elements.strokeEraserMode.classList.remove('active');
+        });
+
+        elements.strokeEraserMode.addEventListener('click', () => {
+            state.eraserMode = 'stroke';
+            elements.strokeEraserMode.classList.add('active');
+            elements.pixelEraserMode.classList.remove('active');
+        });
+
+        // Stroke controls
+        elements.strokeWidth.addEventListener('input', (e) => {
+            state.strokeWidth = parseInt(e.target.value);
+            elements.strokeWidthDisplay.textContent = state.strokeWidth + 'px';
+        });
+
+        elements.colorPicker.addEventListener('change', (e) => {
+            state.strokeColor = e.target.value;
+        });
+
+        // History
+        elements.undoBtn.addEventListener('click', undo);
+        elements.redoBtn.addEventListener('click', redo);
+
+        elements.clearPageBtn.addEventListener('click', () => {
+            if (confirm('Clear all annotations on this page?')) {
+                state.annotations[state.currentPage] = { strokes: [], textboxes: [], stickyNotes: [] };
+                redrawAllAnnotations();
+                pushHistory();
+            }
+        });
+
+        // Save/Export/Import
+        elements.saveBtn.addEventListener('click', saveAnnotations);
+
+        elements.exportBtn.addEventListener('click', exportAnnotations);
+
+        elements.importBtn.addEventListener('click', () => {
+            elements.importModal.classList.add('active');
+        });
+
+        elements.cancelImportBtn.addEventListener('click', () => {
+            elements.importModal.classList.remove('active');
+        });
+
+        elements.confirmImportBtn.addEventListener('click', () => {
+            const json = elements.importJSON.value;
+            if (json.trim()) {
+                importAnnotations(json);
+                elements.importModal.classList.remove('active');
+                elements.importJSON.value = '';
+            }
+        });
+
+        // Zoom
+        elements.zoomOutBtn.addEventListener('click', zoomOut);
+        elements.zoomInBtn.addEventListener('click', zoomIn);
+        elements.fitPageBtn.addEventListener('click', fitPage);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z') { undo(); e.preventDefault(); }
+                if (e.key === 'y') { redo(); e.preventDefault(); }
+            }
+            if (e.key === 'p') setActiveTool('pen');
+            if (e.key === 'c') setActiveTool('pencil');
+            if (e.key === 'h') setActiveTool('highlighter');
+            if (e.key === 'e') setActiveTool('eraser');
+            if (e.key === 't') setActiveTool('textbox');
+            if (e.key === 's') setActiveTool('sticky');
+        });
+
+        // Initialize
+        setActiveTool('pen');
+        updateHistoryButtons();
+    </script>
+</body>
+</html>

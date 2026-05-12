@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Accoly</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="profile.css">
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h2>Accoly</h2>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="community.html" class="nav-item">
+                    <span class="nav-icon">🧑‍🤝‍🧑</span>
+                    <span>Community</span>
+                </a>
+                <a href="notes.html" class="nav-item">
+                    <span class="nav-icon">📝</span>
+                    <span>Notes</span>
+                </a>
+                <a href="notepad.html" class="nav-item">
+                    <span class="nav-icon">✏️</span>
+                    <span>Notepad</span>
+                </a>
+                <a href="flashcards.html" class="nav-item">
+                    <span class="nav-icon">🧠</span>
+                    <span>Flashcards</span>
+                </a>
+                <a href="quiz.html" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>Quiz</span>
+                </a>
+                <a href="leaderboard.html" class="nav-item">
+                    <span class="nav-icon">🏆</span>
+                    <span>Leaderboard</span>
+                </a>
+                <a href="messages.html" class="nav-item">
+                    <span class="nav-icon">💬</span>
+                    <span>Messages</span>
+                </a>
+                <a href="profile.html" class="nav-item active">
+                    <span class="nav-icon">👤</span>
+                    <span>Profile</span>
+                </a>
+                <a href="settings.html" class="nav-item">
+                    <span class="nav-icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-logout">
+                <button onclick="logout()" class="btn btn-outline" style="width: 100%;">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="dashboard-main">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <h2>Profile</h2>
+                <div class="top-bar-right top-bar-actions">
+                    <div class="dropdown-shell dropdown-shell--notif">
+                        <button type="button" class="icon-btn nav-notif-btn" id="navNotifBtn" aria-label="Notifications" aria-expanded="false" aria-haspopup="true">🔔</button>
+                        <span class="nav-badge" id="navNotifBadge" hidden aria-hidden="true">0</span>
+                        <div class="nav-dropdown nav-dropdown--notif" id="navNotifPanel" role="menu" hidden>
+                            <div class="nav-dropdown-title">Notifications</div>
+                            <ul class="nav-dropdown-list" id="navNotifList"></ul>
+                        </div>
+                    </div>
+                    <div class="dropdown-shell dropdown-shell--user">
+                        <button type="button" class="user-menu-trigger" id="navUserBtn" aria-label="Account menu" aria-expanded="false" aria-haspopup="true">
+                            <span class="user-avatar" id="navUserAvatar">U</span>
+                            <span class="user-menu-name" id="navUserName">User</span>
+                            <span class="nav-chevron" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="nav-dropdown nav-dropdown--user" id="navUserPanel" role="menu" hidden>
+                            <a href="profile.html" class="nav-dropdown-item">Profile</a>
+                            <a href="settings.html" class="nav-dropdown-item">Settings</a>
+                            <button type="button" class="nav-dropdown-item nav-dropdown-item--danger" id="navLogoutBtn">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content -->
+            <div class="dashboard-content">
+                <!-- Profile Header -->
+                <div class="profile-header">
+                    <div class="profile-avatar-large" id="profileAvatar"></div>
+                    <div class="profile-info">
+                        <h1 id="profileName"></h1>
+                        <p id="profileEmail"></p>
+                        <p id="profilePlanBadge"></p>
+                        <p id="profileJoinedDate"></p>
+                        <p id="profileLevel"></p>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📈</div>
+                        <div class="stat-info">
+                            <p class="stat-label">Accuracy</p>
+                            <p class="stat-value" id="profileAccuracy">0%</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🎓</div>
+                        <div class="stat-info">
+                            <p class="stat-label">Quizzes</p>
+                            <p class="stat-value" id="profileQuizzes">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-info">
+                            <p class="stat-label">Total XP</p>
+                            <p class="stat-value" id="profileXP">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔥</div>
+                        <div class="stat-info">
+                            <p class="stat-label">Streak</p>
+                            <p class="stat-value" id="profileStreak">0d</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📝</div>
+                        <div class="stat-info">
+                            <p class="stat-label">Notes Created</p>
+                            <p class="stat-value" id="profileNotesCount">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✏️</div>
+                        <div class="stat-info">
+                            <p class="stat-label">Notepad Pages</p>
+                            <p class="stat-value" id="profileNotepadCount">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👍</div>
+                        <div class="stat-info">
+                            <p class="stat-label">Likes Received</p>
+                            <p class="stat-value" id="profileLikesReceived">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Level Progression -->
+                <div class="profile-section">
+                    <h2>Level Progression</h2>
+                    <div class="level-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div>
+                                <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">Current Level</p>
+                                <p style="font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0 0 0;" id="profileCurrentLevel">-</p>
+                            </div>
+                            <div style="font-size: 3rem;" id="profileLevelEmoji">📚</div>
+                        </div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="color: var(--text-secondary); font-size: 0.9rem;">Progress to Next Level</span>
+                                <span style="font-weight: 600;" id="profileProgressPercent">0%</span>
+                            </div>
+                            <div style="width: 100%; height: 12px; background: var(--surface); border-radius: 6px; overflow: hidden;">
+                                <div id="profileProgressBar" style="height: 100%; background: linear-gradient(to right, var(--primary), var(--primary-light)); width: 0%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;" id="profileXPProgress">0 / 0 XP</p>
+                    </div>
+                </div>
+
+                <!-- Achievements -->
+                <div class="profile-section">
+                    <h2>Achievements</h2>
+                    <div class="achievements-grid">
+                        <div class="achievement">
+                            <div class="achievement-icon">⭐</div>
+                            <h4>Quiz Master</h4>
+                            <p>Complete 10 quizzes</p>
+                        </div>
+                        <div class="achievement">
+                            <div class="achievement-icon">🔥</div>
+                            <h4>Perfect Streak</h4>
+                            <p>7-day study streak</p>
+                        </div>
+                        <div class="achievement">
+                            <div class="achievement-icon">🎯</div>
+                            <h4>Accuracy Champ</h4>
+                            <p>90%+ average accuracy</p>
+                        </div>
+                        <div class="achievement">
+                            <div class="achievement-icon">👑</div>
+                            <h4>Top Performer</h4>
+                            <p>Rank in top 10</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Quizzes -->
+                <div class="profile-section">
+                    <h2>Recent Quiz Attempts</h2>
+                    <div id="recentQuizzes" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+                </div>
+                <div class="profile-section">
+                    <h2>Study Trend</h2>
+                    <canvas id="studyChart" width="700" height="220" style="width:100%;max-width:100%;background:var(--background);border:1px solid var(--border);border-radius:var(--radius-lg);"></canvas>
+                </div>
+                <div class="profile-section">
+                    <h2>Study Calendar</h2>
+                    <div id="studyCalendar" class="card"></div>
+                </div>
+                <div class="profile-section">
+                    <h2>Premium</h2>
+                    <div class="card">
+                        <p style="margin-bottom:0.75rem;">Upgrade to unlock advanced analytics, offline quizzes, and more.</p>
+                        <button type="button" class="btn btn-primary" id="profileUpgradeBtn">Upgrade to Premium</button>
+                        <button type="button" class="btn btn-outline" id="profileAdvancedAnalyticsBtn" data-premium="true" style="margin-left:0.5rem;">Advanced analytics</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/nav-header.js"></script>
+    <script src="js/subscription.js"></script>
+    <script src="js/offline.js"></script>
+    <script src="js/profile.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var up = document.getElementById('profileUpgradeBtn');
+            var adv = document.getElementById('profileAdvancedAnalyticsBtn');
+            if (!up) return;
+            if (window.AccolySubscription && AccolySubscription.isPremiumUser()) {
+                up.textContent = 'Premium active';
+                up.disabled = true;
+                up.classList.remove('btn-primary');
+                up.classList.add('btn-outline');
+            } else {
+                up.addEventListener('click', function () {
+                    checkPremiumAccess('Premium subscription');
+                });
+            }
+            if (adv) {
+                adv.addEventListener('click', function () {
+                    if (!checkPremiumAccess('Advanced analytics')) return;
+                    AccountifyUI.toast('Advanced analytics opened (demo)', 'success');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

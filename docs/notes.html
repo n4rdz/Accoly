@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes - Accoly</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="modules.css">
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h2>Accoly</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="community.html" class="nav-item"><span class="nav-icon">🧑‍🤝‍🧑</span><span>Community</span></a>
+                <a href="notes.html" class="nav-item active"><span class="nav-icon">📝</span><span>Notes</span></a>
+                <a href="notepad.html" class="nav-item"><span class="nav-icon">✏️</span><span>Notepad</span></a>
+                <a href="flashcards.html" class="nav-item"><span class="nav-icon">🧠</span><span>Flashcards</span></a>
+                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz</span></a>
+                <a href="leaderboard.html" class="nav-item"><span class="nav-icon">🏆</span><span>Leaderboard</span></a>
+                <a href="messages.html" class="nav-item"><span class="nav-icon">💬</span><span>Messages</span></a>
+                <a href="profile.html" class="nav-item"><span class="nav-icon">👤</span><span>Profile</span></a>
+                <a href="settings.html" class="nav-item"><span class="nav-icon">⚙️</span><span>Settings</span></a>
+            </nav>
+            <div class="sidebar-logout">
+                <button type="button" onclick="logout()" class="btn btn-outline" style="width: 100%;">Logout</button>
+            </div>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="top-bar">
+                <h1 class="module-page-title">Notes</h1>
+                <div class="top-bar-right top-bar-actions">
+                    <div class="dropdown-shell dropdown-shell--notif">
+                        <button type="button" class="icon-btn nav-notif-btn" id="navNotifBtn" aria-label="Notifications" aria-expanded="false" aria-haspopup="true">🔔</button>
+                        <span class="nav-badge" id="navNotifBadge" hidden aria-hidden="true">0</span>
+                        <div class="nav-dropdown nav-dropdown--notif" id="navNotifPanel" role="menu" hidden>
+                            <div class="nav-dropdown-title">Notifications</div>
+                            <ul class="nav-dropdown-list" id="navNotifList"></ul>
+                        </div>
+                    </div>
+                    <div class="dropdown-shell dropdown-shell--user">
+                        <button type="button" class="user-menu-trigger" id="navUserBtn" aria-label="Account menu" aria-expanded="false" aria-haspopup="true">
+                            <span class="user-avatar" id="navUserAvatar">U</span>
+                            <span class="user-menu-name" id="navUserName">User</span>
+                            <span class="nav-chevron" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="nav-dropdown nav-dropdown--user" id="navUserPanel" role="menu" hidden>
+                            <a href="profile.html" class="nav-dropdown-item">Profile</a>
+                            <a href="settings.html" class="nav-dropdown-item">Settings</a>
+                            <button type="button" class="nav-dropdown-item nav-dropdown-item--danger" id="navLogoutBtn">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard-content notes-v2">
+                <div class="notes-manager-shell">
+                    <aside class="module-filters" aria-label="Filter by subject">
+                        <h3>Subject</h3>
+                        <div class="filter-list" id="subjectFilters"></div>
+                    </aside>
+                    <section class="module-main-panel">
+                        <div class="module-toolbar">
+                            <div class="grow">
+                                <input type="search" id="pdfSearch" class="module-search" placeholder="Search PDF files..." autocomplete="off" />
+                            </div>
+                            <select id="pdfSort" class="sort-select">
+                                <option value="recent">Recently edited</option>
+                                <option value="name">Name A-Z</option>
+                                <option value="created">Upload date</option>
+                            </select>
+                            <input type="file" id="pdfUploadInput" accept="application/pdf" hidden />
+                            <button type="button" id="btnUploadPdf" class="btn btn-primary">Upload PDF</button>
+                            <button type="button" id="btnNewNote" class="btn btn-outline">+ New Note</button>
+                        </div>
+                        <div class="manager-grid">
+                            <section class="card manager-section">
+                                <h3>Recent Files</h3>
+                                <div id="recentFilesList" class="pdf-file-grid"></div>
+                            </section>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="notebookModal" class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-panel" style="max-width:480px;">
+            <div class="modal-header">
+                <h2>New notebook (Premium)</h2>
+                <button type="button" class="modal-close" id="notebookModalClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="notebookName">Notebook name</label>
+                    <input type="text" id="notebookName" class="form-input" placeholder="e.g. FAR Review Notes">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="notebookCancelBtn">Cancel</button>
+                <button type="button" class="btn btn-primary" id="notebookSaveBtn">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="noteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle">
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2 id="noteModalTitle">New Note</h2>
+                <button type="button" class="modal-close" id="noteModalClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="noteTitle">Title</label>
+                    <input type="text" id="noteTitle" class="form-input" placeholder="Note title" maxlength="200">
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="noteSubject">Subject</label>
+                    <select id="noteSubject" class="form-select"></select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                    <label for="noteContent">Content</label>
+                    <textarea id="noteContent" class="form-textarea" placeholder="Write your note…"></textarea>
+                </div>
+                <p class="autosave-indicator" id="autosaveStatus" aria-live="polite"></p>
+                <div class="note-pdf-row" id="notePdfRow" style="display:none;">
+                    <div class="note-pdf-meta" id="notePdfMeta"></div>
+                    <div class="note-pdf-actions">
+                        <button type="button" class="btn btn-outline" id="noteViewPdfBtn">View PDF</button>
+                        <button type="button" class="btn btn-outline" id="noteDetachPdfBtn">Detach</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="noteDeleteBtn" style="display: none; margin-right: auto;">Delete</button>
+                <button type="button" class="btn btn-outline" id="noteCancelBtn">Close</button>
+                <button type="button" class="btn btn-primary" id="noteSaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Editor -->
+    <div id="pdfEditorModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pdfViewerTitle">
+        <div class="modal-panel pdf-editor-modal">
+            <div class="modal-header">
+                <h2 id="pdfViewerTitle">PDF Annotation Editor</h2>
+                <div class="pdf-save-indicator" id="pdfSaveStatus">Saved</div>
+                <button type="button" class="modal-close" id="pdfEditorClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="pdf-toolbar card" aria-label="PDF annotation tools">
+                    <div class="tool-group pdf-tool-group">
+                        <button type="button" class="tool-btn active" data-pdftool="pen">Pen</button>
+                        <button type="button" class="tool-btn" data-pdftool="pencil">Pencil</button>
+                        <button type="button" class="tool-btn" data-pdftool="highlighter">Highlighter</button>
+                        <button type="button" class="tool-btn" data-pdftool="eraser">Eraser</button>
+                        <div class="eraser-mode-toggle">
+                            <span class="eraser-mode-label" id="eraserModeLabel">Pixel</span>
+                            <button type="button" class="eraser-mode-btn" id="eraserModeToggle">
+                                <span class="eraser-mode-option active" data-mode="pixel">Pixel</span>
+                                <span class="eraser-mode-option" data-mode="stroke">Stroke</span>
+                            </button>
+                        </div>
+                        <button type="button" class="tool-btn" data-pdftool="sticky">Sticky note</button>
+                    </div>
+                    <div class="tool-group pdf-controls-group">
+                        <input type="color" id="pdfColor" value="#1E3A8A" class="color-picker" aria-label="Annotation color" />
+                        <input type="range" id="pdfSize" min="1" max="40" value="6" class="brush-slider" aria-label="Stroke size" />
+                        <input type="range" id="pdfOpacity" min="10" max="100" value="100" class="brush-slider" aria-label="Opacity" />
+                    </div>
+                    <div class="tool-group pdf-actions-group">
+                        <button type="button" class="tool-btn" id="pdfPrevPageBtn">Prev</button>
+                        <input type="number" id="pdfPageInput" min="1" value="1" class="sort-select" style="width:80px;" />
+                        <span id="pdfTotalPages" style="font-size:0.8rem;color:var(--text-secondary);">/ 1</span>
+                        <button type="button" class="tool-btn" id="pdfNextPageBtn">Next</button>
+                        <button type="button" class="tool-btn" id="pdfZoomOutBtn">-</button>
+                        <span id="pdfZoomLabel" style="font-size:0.8rem;color:var(--text-secondary);">100%</span>
+                        <button type="button" class="tool-btn" id="pdfZoomInBtn">+</button>
+                        <button type="button" class="tool-btn" id="pdfUndoBtn">Undo</button>
+                        
+                        <button type="button" class="tool-btn" id="pdfClearBtn">Clear all</button>
+                    </div>
+                </div>
+                <div class="pdf-editor-layout">
+                    <aside class="pdf-thumbs-panel" id="pdfThumbsPanel"></aside>
+                    <section class="pdf-scroll-wrap" id="pdfScrollWrap">
+                        <div id="pdfPagesRoot"></div>
+                    </section>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="pdfCloseBtn">Close</button>
+                <button type="button" class="btn btn-outline" id="pdfDeleteBtn">Delete PDF</button>
+                <button type="button" class="btn btn-primary" id="pdfSaveBtn">Save now</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/nav-header.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/subscription.js"></script>
+    <script src="js/offline.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="js/notes.js"></script>
+</body>
+</html>

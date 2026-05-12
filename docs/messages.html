@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages - Accoly</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="modules.css">
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><h2>Accoly</h2></div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="community.html" class="nav-item"><span class="nav-icon">🧑‍🤝‍🧑</span><span>Community</span></a>
+                <a href="notes.html" class="nav-item"><span class="nav-icon">📝</span><span>Notes</span></a>
+                <a href="notepad.html" class="nav-item"><span class="nav-icon">✏️</span><span>Notepad</span></a>
+                <a href="flashcards.html" class="nav-item"><span class="nav-icon">🧠</span><span>Flashcards</span></a>
+                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz</span></a>
+                <a href="leaderboard.html" class="nav-item"><span class="nav-icon">🏆</span><span>Leaderboard</span></a>
+                <a href="messages.html" class="nav-item active"><span class="nav-icon">💬</span><span>Messages</span></a>
+                <a href="profile.html" class="nav-item"><span class="nav-icon">👤</span><span>Profile</span></a>
+                <a href="settings.html" class="nav-item"><span class="nav-icon">⚙️</span><span>Settings</span></a>
+            </nav>
+            <div class="sidebar-logout">
+                <button type="button" onclick="logout()" class="btn btn-outline" style="width: 100%;">Logout</button>
+            </div>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="top-bar">
+                <h1 class="module-page-title">Messages</h1>
+                <div class="top-bar-right top-bar-actions">
+                    <div class="dropdown-shell dropdown-shell--notif">
+                        <button type="button" class="icon-btn nav-notif-btn" id="navNotifBtn" aria-label="Notifications" aria-expanded="false" aria-haspopup="true">🔔</button>
+                        <span class="nav-badge" id="navNotifBadge" hidden aria-hidden="true">0</span>
+                        <div class="nav-dropdown nav-dropdown--notif" id="navNotifPanel" role="menu" hidden>
+                            <div class="nav-dropdown-title">Notifications</div>
+                            <ul class="nav-dropdown-list" id="navNotifList"></ul>
+                        </div>
+                    </div>
+                    <div class="dropdown-shell dropdown-shell--user">
+                        <button type="button" class="user-menu-trigger" id="navUserBtn" aria-label="Account menu" aria-expanded="false" aria-haspopup="true">
+                            <span class="user-avatar" id="navUserAvatar">U</span>
+                            <span class="user-menu-name" id="navUserName">User</span>
+                            <span class="nav-chevron" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="nav-dropdown nav-dropdown--user" id="navUserPanel" role="menu" hidden>
+                            <a href="profile.html" class="nav-dropdown-item">Profile</a>
+                            <a href="settings.html" class="nav-dropdown-item">Settings</a>
+                            <button type="button" class="nav-dropdown-item nav-dropdown-item--danger" id="navLogoutBtn">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="messages-layout">
+                    <aside class="messages-list">
+                        <div class="module-toolbar" style="box-shadow:none;border:none;padding:0;margin-bottom:0.75rem;">
+                            <div class="grow">
+                                <select id="msgUserPicker" class="sort-select" style="width:100%;"></select>
+                            </div>
+                            <button type="button" id="btnStartChat" class="btn btn-outline">Start</button>
+                        </div>
+                        <div id="conversationList"></div>
+                    </aside>
+
+                    <section class="messages-chat">
+                        <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:0.75rem;">
+                            <div>
+                                <h3 style="margin:0;" id="chatTitle">Select a conversation</h3>
+                                <p style="margin:0;" id="chatSubtitle"></p>
+                            </div>
+                            <button type="button" class="btn btn-outline" id="btnPremiumGroup" title="Premium">
+                                🔒 Create group
+                            </button>
+                        </div>
+
+                        <div class="card" style="margin-bottom:0.75rem;">
+                            <h3 style="margin-bottom:0.5rem;">Groups</h3>
+                            <div id="groupList"></div>
+                        </div>
+
+                        <div class="chat-scroll" id="chatMessages"></div>
+
+                        <div class="card" style="margin-top:0.75rem;">
+                            <div style="display:flex; gap:0.5rem; align-items:flex-end;">
+                                <textarea id="chatInput" class="form-textarea" rows="2" placeholder="Write a message..." style="min-height:auto;flex:1;"></textarea>
+                                <button type="button" id="btnSendMsg" class="btn btn-primary">Send</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/nav-header.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/subscription.js"></script>
+    <script src="js/offline.js"></script>
+    <script src="js/messages.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Accoly</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="modules.css">
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><h2>Accoly</h2></div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="community.html" class="nav-item"><span class="nav-icon">🧑‍🤝‍🧑</span><span>Community</span></a>
+                <a href="notes.html" class="nav-item"><span class="nav-icon">📝</span><span>Notes</span></a>
+                <a href="notepad.html" class="nav-item"><span class="nav-icon">✏️</span><span>Notepad</span></a>
+                <a href="flashcards.html" class="nav-item"><span class="nav-icon">🧠</span><span>Flashcards</span></a>
+                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz</span></a>
+                <a href="leaderboard.html" class="nav-item"><span class="nav-icon">🏆</span><span>Leaderboard</span></a>
+                <a href="messages.html" class="nav-item"><span class="nav-icon">💬</span><span>Messages</span></a>
+                <a href="profile.html" class="nav-item"><span class="nav-icon">👤</span><span>Profile</span></a>
+                <a href="settings.html" class="nav-item active"><span class="nav-icon">⚙️</span><span>Settings</span></a>
+            </nav>
+            <div class="sidebar-logout">
+                <button onclick="logout()" class="btn btn-outline" style="width: 100%;">Logout</button>
+            </div>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="top-bar">
+                <h2>Settings</h2>
+                <div class="top-bar-right top-bar-actions">
+                    <div class="dropdown-shell dropdown-shell--notif">
+                        <button type="button" class="icon-btn nav-notif-btn" id="navNotifBtn" aria-label="Notifications" aria-expanded="false" aria-haspopup="true">🔔</button>
+                        <span class="nav-badge" id="navNotifBadge" hidden aria-hidden="true">0</span>
+                        <div class="nav-dropdown nav-dropdown--notif" id="navNotifPanel" role="menu" hidden>
+                            <div class="nav-dropdown-title">Notifications</div>
+                            <ul class="nav-dropdown-list" id="navNotifList"></ul>
+                        </div>
+                    </div>
+                    <div class="dropdown-shell dropdown-shell--user">
+                        <button type="button" class="user-menu-trigger" id="navUserBtn" aria-label="Account menu" aria-expanded="false" aria-haspopup="true">
+                            <span class="user-avatar" id="navUserAvatar">U</span>
+                            <span class="user-menu-name" id="navUserName">User</span>
+                            <span class="nav-chevron" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="nav-dropdown nav-dropdown--user" id="navUserPanel" role="menu" hidden>
+                            <a href="profile.html" class="nav-dropdown-item">Profile</a>
+                            <a href="settings.html" class="nav-dropdown-item">Settings</a>
+                            <button type="button" class="nav-dropdown-item nav-dropdown-item--danger" id="navLogoutBtn">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="card" style="max-width: 600px;">
+                    <h2>⚙️ Settings</h2>
+                    
+                    <div style="margin-bottom: 2rem;">
+                        <h3>Account Settings</h3>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="settingEmail" readonly style="background: var(--surface); cursor: not-allowed;">
+                        </div>
+                        <div class="form-group">
+                            <label for="themeSelect">Theme</label>
+                            <select id="themeSelect" class="form-select sort-select" style="width: 100%; max-width: 400px;">
+                                <option value="light">Light (Default)</option>
+                                <option value="dark">Dark</option>
+                                <option value="auto">Auto (system)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" checked> Enable notifications
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="border-top: 1px solid var(--border); padding-top: 2rem; margin-top: 1.5rem;">
+                        <h3>Subscription / Plan</h3>
+
+                        <div class="card" style="margin-top: 1rem; position: relative;">
+                            <div style="position:absolute; top: 14px; right: 14px;">
+                                <span id="planBadge" class="badge-restricted" style="border-color: rgba(59,130,246,0.25); background: rgba(59,130,246,0.10); color: var(--primary);">Recommended</span>
+                            </div>
+
+                            <h2 style="margin-bottom: 0.25rem;" id="planName">Basic Plan</h2>
+                            <p id="planMeta" style="margin-bottom: 1rem;"></p>
+
+                            <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom: 1rem;">
+                                <div class="upgrade-pill">🔒 Group chat creation</div>
+                                <div class="upgrade-pill">🔒 Offline quizzes</div>
+                                <div class="upgrade-pill">🔒 Advanced explanations</div>
+                                <div class="upgrade-pill">🔒 Unlimited flashcards</div>
+                                <div class="upgrade-pill">🔒 Anonymous posting</div>
+                            </div>
+
+                            <div id="premiumActiveRow" style="display:none; align-items:center; justify-content:space-between; gap: 0.75rem; flex-wrap: wrap;">
+                                <div>
+                                    <strong>You are a Premium User</strong>
+                                    <div style="font-size:0.9rem;color:var(--text-secondary);">Subscribed since: <span id="premiumSince">—</span></div>
+                                </div>
+                            </div>
+
+                            <button type="button" id="btnUpgradePremium" class="btn btn-primary" style="margin-top:0.75rem;">
+                                Upgrade to Premium
+                            </button>
+                            <p style="font-size:0.85rem; margin-top:0.75rem;">Simulation only — no real payments.</p>
+                        </div>
+                    </div>
+
+                    <div style="border-top: 1px solid var(--border); padding-top: 2rem;">
+                        <h3>Danger Zone</h3>
+                        <button onclick="clearData()" class="btn" style="background: var(--danger); color: white;">
+                            Clear All Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="subscribeModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="subscribeModalTitle">
+        <div class="modal-panel" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2 id="subscribeModalTitle">Confirm Premium upgrade</h2>
+                <button type="button" class="modal-close" id="subscribeModalClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:0.75rem;">You’re about to unlock Premium features instantly:</p>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <div class="upgrade-pill">Unlimited flashcards</div>
+                    <div class="upgrade-pill">Offline quizzes</div>
+                    <div class="upgrade-pill">Advanced analytics</div>
+                    <div class="upgrade-pill">Anonymous posting</div>
+                    <div class="upgrade-pill">Private study channels</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="subscribeCancelBtn">Cancel</button>
+                <button type="button" class="btn btn-primary" id="subscribeConfirmBtn">Confirm upgrade</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/nav-header.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/subscription.js"></script>
+    <script src="js/offline.js"></script>
+    <script src="js/settings.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var modal = document.getElementById('subscribeModal');
+            var closeBtn = document.getElementById('subscribeModalClose');
+            var cancelBtn = document.getElementById('subscribeCancelBtn');
+            var confirmBtn = document.getElementById('subscribeConfirmBtn');
+
+            function close() {
+                if (!modal) return;
+                modal.classList.remove('open');
+            }
+
+            if (closeBtn) closeBtn.addEventListener('click', close);
+            if (cancelBtn) cancelBtn.addEventListener('click', close);
+            if (modal) modal.addEventListener('click', function (e) {
+                if (e.target === modal) close();
+            });
+            if (confirmBtn) confirmBtn.addEventListener('click', function () {
+                subscribeToPremium();
+            });
+        });
+    </script>
+</body>
+</html>

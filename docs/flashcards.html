@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards - Accoly</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="modules.css">
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><h2>Accoly</h2></div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="community.html" class="nav-item"><span class="nav-icon">🧑‍🤝‍🧑</span><span>Community</span></a>
+                <a href="notes.html" class="nav-item"><span class="nav-icon">📝</span><span>Notes</span></a>
+                <a href="notepad.html" class="nav-item"><span class="nav-icon">✏️</span><span>Notepad</span></a>
+                <a href="flashcards.html" class="nav-item active"><span class="nav-icon">🧠</span><span>Flashcards</span></a>
+                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz</span></a>
+                <a href="leaderboard.html" class="nav-item"><span class="nav-icon">🏆</span><span>Leaderboard</span></a>
+                <a href="messages.html" class="nav-item"><span class="nav-icon">💬</span><span>Messages</span></a>
+                <a href="profile.html" class="nav-item"><span class="nav-icon">👤</span><span>Profile</span></a>
+                <a href="settings.html" class="nav-item"><span class="nav-icon">⚙️</span><span>Settings</span></a>
+            </nav>
+            <div class="sidebar-logout">
+                <button type="button" onclick="logout()" class="btn btn-outline" style="width: 100%;">Logout</button>
+            </div>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="top-bar">
+                <h1 class="module-page-title">Flashcards</h1>
+                <div class="top-bar-right top-bar-actions">
+                    <div class="dropdown-shell dropdown-shell--notif">
+                        <button type="button" class="icon-btn nav-notif-btn" id="navNotifBtn" aria-label="Notifications" aria-expanded="false" aria-haspopup="true">🔔</button>
+                        <span class="nav-badge" id="navNotifBadge" hidden aria-hidden="true">0</span>
+                        <div class="nav-dropdown nav-dropdown--notif" id="navNotifPanel" role="menu" hidden>
+                            <div class="nav-dropdown-title">Notifications</div>
+                            <ul class="nav-dropdown-list" id="navNotifList"></ul>
+                        </div>
+                    </div>
+                    <div class="dropdown-shell dropdown-shell--user">
+                        <button type="button" class="user-menu-trigger" id="navUserBtn" aria-label="Account menu" aria-expanded="false" aria-haspopup="true">
+                            <span class="user-avatar" id="navUserAvatar">U</span>
+                            <span class="user-menu-name" id="navUserName">User</span>
+                            <span class="nav-chevron" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="nav-dropdown nav-dropdown--user" id="navUserPanel" role="menu" hidden>
+                            <a href="profile.html" class="nav-dropdown-item">Profile</a>
+                            <a href="settings.html" class="nav-dropdown-item">Settings</a>
+                            <button type="button" class="nav-dropdown-item nav-dropdown-item--danger" id="navLogoutBtn">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="module-toolbar">
+                    <div class="grow">
+                        <select id="flashSubject" class="sort-select" style="max-width: 320px; width: 100%;"></select>
+                    </div>
+                    <button type="button" id="btnAddCard" class="btn btn-outline">+ Add Card</button>
+                    <button type="button" id="btnResetDaily" class="btn btn-outline">Reset Daily Progress</button>
+                </div>
+
+                <div class="card" style="margin: 1rem 0;">
+                    <p id="flashDailyInfo" style="margin-bottom: 0.5rem;"></p>
+                    <p id="flashStatsInfo"></p>
+                </div>
+
+                <div id="flashcardWrap" class="card" style="max-width: 620px; margin: 0 auto; text-align:center;">
+                    <div id="flashEmpty" style="display:none;">No cards in this subject yet. Add your first card.</div>
+                    <div id="flashCardUI">
+                        <div id="flashCard" class="card" style="min-height: 220px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                            <h3 id="flashCardText"></h3>
+                        </div>
+                        <p style="margin-top: 0.75rem;">Tap card to flip</p>
+                        <div style="display:flex; justify-content:center; gap: 0.75rem; flex-wrap: wrap;">
+                            <button type="button" id="btnWrong" class="btn btn-outline">I missed this</button>
+                            <button type="button" id="btnCorrect" class="btn btn-primary">I got it</button>
+                        </div>
+                        <div style="display:flex; justify-content:center; gap: 0.75rem; flex-wrap: wrap; margin-top:0.75rem;">
+                            <button type="button" id="btnPrevCard" class="btn btn-outline">Prev</button>
+                            <button type="button" id="btnNextCard" class="btn btn-outline">Next</button>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="card" style="margin-top:1rem;">
+                    <h3>Confusion tracker</h3>
+                    <div id="confusionList"></div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="flashModal" class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2>Add flashcard</h2>
+                <button type="button" class="modal-close" id="flashModalClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label for="flashQuestion">Front (question)</label>
+                    <textarea id="flashQuestion" class="form-textarea" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="flashAnswer">Back (answer)</label>
+                    <textarea id="flashAnswer" class="form-textarea" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="flashCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="flashSave">Save card</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/nav-header.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/subscription.js"></script>
+    <script src="js/offline.js"></script>
+    <script src="js/flashcards.js"></script>
+</body>
+</html>
