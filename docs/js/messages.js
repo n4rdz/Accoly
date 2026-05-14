@@ -8,15 +8,28 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+// Cache of all users fetched from Supabase
+var MSG_ALL_USERS = [];
+
 function initMessages() {
     var user = Storage.getCurrentUser();
     if (!user) return; // auth.js already redirected
 
     bindPremiumLocks();
-    initUserPicker();
-    renderConversationList();
-    renderGroupList();
     bindChatActions();
+
+    // Load all users from Supabase first, then render everything
+    SupabaseClient.getAllUsers().then(function (users) {
+        MSG_ALL_USERS = users || [];
+        initUserPicker();
+        renderConversationList();
+        renderGroupList();
+    }).catch(function () {
+        MSG_ALL_USERS = [];
+        initUserPicker();
+        renderConversationList();
+        renderGroupList();
+    });
 
     window.addEventListener('storage', function (e) {
         if (!e || !e.key) return;
@@ -30,14 +43,17 @@ function initMessages() {
 
 function allUsersExceptMe() {
     var me = Storage.getCurrentUser();
-    var users = JSON.parse(localStorage.getItem('users') || '[]');
-    return users.filter(function (u) { return u.id !== me.id; });
+    return MSG_ALL_USERS.filter(function (u) { return u.id !== me.id; });
 }
 
 function initUserPicker() {
     var picker = document.getElementById('msgUserPicker');
+    var others = allUsersExceptMe();
     picker.innerHTML = '<option value="">Select student…</option>';
-    allUsersExceptMe().forEach(function (u) {
+    if (others.length === 0) {
+        picker.innerHTML = '<option value="">No other students found</option>';
+    }
+    others.forEach(function (u) {
         var o = document.createElement('option');
         o.value = u.id;
         o.textContent = u.fullName + (u.subscriptionStatus === 'premium' ? ' ★' : '');
@@ -52,7 +68,7 @@ function initUserPicker() {
 
 function renderConversationList() {
     var me = Storage.getCurrentUser();
-    var users = JSON.parse(localStorage.getItem('users') || '[]');
+    var users = MSG_ALL_USERS;
     var msgs = Storage.getMessages();
 
     var partnerIds = {};
@@ -108,8 +124,7 @@ function renderConversationList() {
 function openChat(otherUserId) {
     MSG.activeUserId = otherUserId;
     MSG.activeGroupId = null;
-    var users = JSON.parse(localStorage.getItem('users') || '[]');
-    var other = users.find(function (u) { return u.id === otherUserId; });
+    var other = MSG_ALL_USERS.find(function (u) { return u.id === otherUserId; });
     document.getElementById('chatTitle').textContent = other ? other.fullName : 'Conversation';
     document.getElementById('chatSubtitle').textContent = other && other.subscriptionStatus === 'premium' ? 'Premium student' : 'Basic student';
     renderChat();
@@ -278,8 +293,7 @@ function createGroupFlow() {
 }
 
 function displayName(userId) {
-    var users = JSON.parse(localStorage.getItem('users') || '[]');
-    var u = users.find(function (x) { return x.id === userId; });
+    var u = MSG_ALL_USERS.find(function (x) { return x.id === userId; });
     return u ? u.fullName : 'Student';
 }
 
