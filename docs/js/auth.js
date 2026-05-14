@@ -5,6 +5,11 @@
 
 // Inject loading overlay immediately — before DOMContentLoaded
 (function () {
+    var currentPage = window.location.pathname.split('/').pop() || 'index.html';
+    var isAuthPage = currentPage.includes('login') ||
+                     currentPage.includes('signup') ||
+                     currentPage === 'index.html';
+    if (isAuthPage) return; // Don't show overlay on login/signup pages
     var overlay = document.createElement('div');
     overlay.id = 'auth-overlay';
     overlay.style.cssText = [
