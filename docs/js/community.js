@@ -1,42 +1,58 @@
 // ============================================
-// COMMUNITY MODULE (FB group-style)
+// COMMUNITY MODULE — Supabase-backed
 // ============================================
 
 var communityState = { sort: 'newest', search: '', type: 'all', tag: '' };
 var postModalState = { editingId: null };
+var COMM_POSTS = []; // in-memory cache
 
 document.addEventListener('DOMContentLoaded', function () {
-    document.addEventListener('authReady', initializePage);
-
-    // If auth already finished before this script loaded
     if (window.__authReady) {
-        initializePage();
+        initCommunity();
+    } else {
+        window.addEventListener('authReady', initCommunity);
     }
 });
 
-async function initializePage() {
+function initCommunity() {
     var user = Storage.getCurrentUser();
+    if (!user) return (window.location.href = 'login.html');
 
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
-    }
-
-    seedCommunity();
     initComposer(user);
     bindFilters();
     bindPostModal();
-    renderFeed();
-    renderContributorLeaderboard();
+    loadAndRender();
+
+    // Auto-refresh every 30 seconds so new posts from other users appear
+    setInterval(loadAndRender, 30000);
+}
+
+// ── Load from Supabase then render ────────────────────────────────────────────
+function loadAndRender() {
+    SupabaseClient.getPosts().then(function (posts) {
+        COMM_POSTS = posts || [];
+        // Seed if totally empty
+        if (!COMM_POSTS.length) {
+            seedCommunity();
+            return;
+        }
+        renderFeed();
+        renderContributorLeaderboard();
+    }).catch(function () {
+        // Fall back to last known cache
+        renderFeed();
+        renderContributorLeaderboard();
+    });
 }
 
 function initComposer(user) {
     var avatarEl = document.getElementById('composerAvatar');
-    if (avatarEl) avatarEl.textContent = initials(user.fullName || user.name || 'User');
+    if (avatarEl) avatarEl.textContent = initials(user.fullName || 'User');
     var openBtn = document.getElementById('openPostModalBtn');
     if (openBtn) openBtn.addEventListener('click', function () { openPostModal(null); });
 }
 
+// ── Filters ───────────────────────────────────────────────────────────────────
 function bindFilters() {
     document.getElementById('communitySearch').addEventListener('input', function (e) {
         communityState.search = (e.target.value || '').trim().toLowerCase();
@@ -59,19 +75,15 @@ function bindFilters() {
     }
 }
 
+// ── Post modal ────────────────────────────────────────────────────────────────
 function bindPostModal() {
     var modal = document.getElementById('postModal');
     var closeBtn = document.getElementById('postModalClose');
     var cancelBtn = document.getElementById('postModalCancelBtn');
     var saveBtn = document.getElementById('postModalSaveBtn');
-
     if (closeBtn) closeBtn.addEventListener('click', closePostModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closePostModal);
-    if (modal) {
-        modal.addEventListener('click', function (e) {
-            if (e.target && e.target.id === 'postModal') closePostModal();
-        });
-    }
+    if (modal) modal.addEventListener('click', function (e) { if (e.target === modal) closePostModal(); });
     if (saveBtn) saveBtn.addEventListener('click', saveFromPostModal);
 }
 
@@ -87,7 +99,7 @@ function openPostModal(postId) {
 
     if (postId) {
         var me = Storage.getCurrentUser();
-        var post = Storage.getPosts().find(function (p) { return p.id === postId; });
+        var post = COMM_POSTS.find(function (p) { return p.id === postId; });
         if (!post || !me || post.userId !== me.id) return;
         titleEl.textContent = 'Edit Post';
         saveBtn.textContent = 'Save';
@@ -113,140 +125,97 @@ function closePostModal() {
 }
 
 function parseTags(input) {
-    return (input || '')
-        .split(',')
-        .map(function (t) { return (t || '').trim(); })
-        .filter(Boolean)
-        .map(function (t) { return t.replace(/^#/, '').trim(); })
+    return (input || '').split(',')
+        .map(function (t) { return (t || '').trim().replace(/^#/, '').trim(); })
         .filter(Boolean);
 }
 
 function saveFromPostModal() {
     var me = Storage.getCurrentUser();
-    if (!me) {
-        AccountifyUI.toast('Please login to post', 'error');
-        return;
-    }
+    if (!me) { AccountifyUI.toast('Please login to post', 'error'); return; }
 
     var content = (document.getElementById('postModalContent').value || '').trim();
     var type = document.getElementById('postModalType').value;
     var tags = parseTags(document.getElementById('postModalTags').value);
 
-    // Validate inputs
     if (!validatePostContent(content)) {
-        if (!content) {
-            AccountifyUI.toast('Post content is required (min 10 characters)', 'warning');
-        } else if (content.length > 6000) {
-            AccountifyUI.toast('Post content too long (max 6000 characters)', 'warning');
-        } else {
-            AccountifyUI.toast('Invalid post content', 'warning');
-        }
+        if (!content || content.length < 10) AccountifyUI.toast('Post content is required (min 10 characters)', 'warning');
+        else if (content.length > 6000) AccountifyUI.toast('Post content too long (max 6000 characters)', 'warning');
+        else AccountifyUI.toast('Invalid post content', 'warning');
         return;
     }
-
     if (!validateTags(tags)) {
-        if (!tags.length) {
-            AccountifyUI.toast('At least 1 tag is required (max 5 tags)', 'warning');
-        } else {
-            AccountifyUI.toast('Invalid tags (max 20 characters each, alphanumeric only)', 'warning');
-        }
+        AccountifyUI.toast('Add 1–5 tags (letters, numbers, hyphens only, max 20 chars each)', 'warning');
         return;
     }
 
-    try {
-        if (postModalState.editingId) {
-            var existing = Storage.getPosts().find(function (p) { return p.id === postModalState.editingId; });
-            if (!existing || existing.userId !== me.id) {
-                AccountifyUI.toast('Cannot edit this post', 'error');
-                return;
-            }
-            existing.content = content;
-            existing.type = type;
-            existing.tags = tags;
-            existing.updatedAt = new Date().toISOString();
-            Storage.savePost(existing);
-            AccountifyUI.toast('Post updated', 'success');
-        } else {
-            Storage.savePost({
-                userId: me.id,
-                userName: me.fullName || me.name || 'Student',
-                content: content,
-                type: type,
-                tags: tags,
-                reactions: { like: [], love: [], laugh: [], helpful: [] },
-                comments: []
-            });
-            Storage.addNotification({ userId: me.id, message: 'Your community post is now live.' });
-            if (window.AccountifyNav) window.AccountifyNav.refreshNotifications();
-            AccountifyUI.toast('Posted successfully', 'success');
+    var saveBtn = document.getElementById('postModalSaveBtn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    var postData;
+    if (postModalState.editingId) {
+        var existing = COMM_POSTS.find(function (p) { return p.id === postModalState.editingId; });
+        if (!existing || existing.userId !== me.id) {
+            AccountifyUI.toast('Cannot edit this post', 'error');
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+            return;
         }
+        postData = Object.assign({}, existing, { content: content, type: type, tags: tags, updatedAt: new Date().toISOString() });
+    } else {
+        postData = {
+            userId: me.id,
+            userName: me.fullName || 'Student',
+            content: content,
+            type: type,
+            tags: tags,
+            reactions: { like: [], love: [], laugh: [], helpful: [] },
+            comments: []
+        };
+    }
 
+    SupabaseClient.savePost(postData).then(function (saved) {
+        if (!saved) { AccountifyUI.toast('Failed to save post', 'error'); return; }
+        AccountifyUI.toast(postModalState.editingId ? 'Post updated' : 'Posted successfully', 'success');
         closePostModal();
-        renderFeed();
-        renderContributorLeaderboard();
-    } catch (error) {
-        console.error('Error saving post:', error);
+        loadAndRender();
+    }).catch(function () {
         AccountifyUI.toast('Failed to save post', 'error');
-    }
+    }).finally(function () {
+        saveBtn.disabled = false;
+        saveBtn.textContent = postModalState.editingId ? 'Save' : 'Post';
+    });
 }
 
+// ── Seed posts (only runs if Supabase posts table is empty) ───────────────────
 function seedCommunity() {
-    if ((Storage.getPosts() || []).length > 0) return;
-    Storage.savePost({
-        userId: 'system',
-        userName: 'Accoly Team',
-        type: 'Problem',
-        content: 'How do you approach deferred tax liability adjustments quickly?',
-        tags: ['Taxation', 'exam-tip'],
-        comments: [
-            {
-                userId: 'system',
-                userName: 'Accoly Team',
-                content: 'Share your quick rules-of-thumb and common pitfalls.',
-                createdAt: new Date(Date.now() - 55 * 60000).toISOString()
-            }
-        ],
-        createdAt: new Date(Date.now() - 75 * 60000).toISOString()
-    });
-    Storage.savePost({
-        userId: 'system',
-        userName: 'Accoly Team',
-        type: 'Casual',
-        content: 'Saturday group study session starts at 8 PM. Drop your topics so we can prep.',
-        tags: ['Auditing', 'study-group'],
-        createdAt: new Date(Date.now() - 3 * 3600000).toISOString()
-    });
+    var seeds = [
+        {
+            userId: 'system', userName: 'Accoly Team', type: 'Problem',
+            content: 'How do you approach deferred tax liability adjustments quickly?',
+            tags: ['Taxation', 'exam-tip'],
+            reactions: { like: [], love: [], laugh: [], helpful: [] },
+            comments: [{ id: 'seed-c1', userId: 'system', userName: 'Accoly Team', content: 'Share your quick rules-of-thumb and common pitfalls.', createdAt: new Date(Date.now() - 55 * 60000).toISOString() }],
+            createdAt: new Date(Date.now() - 75 * 60000).toISOString()
+        },
+        {
+            userId: 'system', userName: 'Accoly Team', type: 'Casual',
+            content: 'Saturday group study session starts at 8 PM. Drop your topics so we can prep.',
+            tags: ['Auditing', 'study-group'],
+            reactions: { like: [], love: [], laugh: [], helpful: [] },
+            comments: [],
+            createdAt: new Date(Date.now() - 3 * 3600000).toISOString()
+        }
+    ];
+
+    Promise.all(seeds.map(function (s) { return SupabaseClient.savePost(s); })).then(loadAndRender).catch(loadAndRender);
 }
 
-function displayName(post) {
-    if (!post) return 'Student';
-    if (post.userId === 'system') return 'Accoly Team';
-    return post.userName || 'Student';
-}
-
-function countReactions(post) {
-    if (!post || !post.reactions) return 0;
-    return (
-        (post.reactions.like || []).length +
-        (post.reactions.love || []).length +
-        (post.reactions.laugh || []).length +
-        (post.reactions.helpful || []).length
-    );
-}
-
-function myReaction(post, userId) {
-    if (!post || !post.reactions) return null;
-    var keys = ['like', 'love', 'laugh', 'helpful'];
-    for (var i = 0; i < keys.length; i++) {
-        var k = keys[i];
-        if (Array.isArray(post.reactions[k]) && post.reactions[k].indexOf(userId) !== -1) return k;
-    }
-    return null;
-}
-
+// ── Reactions ─────────────────────────────────────────────────────────────────
 function toggleReaction(postId, reactionKey) {
     var me = Storage.getCurrentUser();
-    var post = Storage.getPosts().find(function (p) { return p.id === postId; });
+    var post = COMM_POSTS.find(function (p) { return p.id === postId; });
     if (!me || !post) return;
 
     post.reactions = post.reactions || { like: [], love: [], laugh: [], helpful: [] };
@@ -258,68 +227,85 @@ function toggleReaction(postId, reactionKey) {
     if (current === reactionKey) {
         post.reactions[reactionKey] = post.reactions[reactionKey].filter(function (id) { return id !== me.id; });
     } else {
-        if (current) {
-            post.reactions[current] = post.reactions[current].filter(function (id) { return id !== me.id; });
-        }
+        if (current) post.reactions[current] = post.reactions[current].filter(function (id) { return id !== me.id; });
         post.reactions[reactionKey].push(me.id);
     }
 
-    post.updatedAt = new Date().toISOString();
-    Storage.savePost(post);
+    // Optimistic UI update
     renderFeed();
     renderContributorLeaderboard();
+
+    // Persist to Supabase
+    SupabaseClient.savePost(post).catch(function () {
+        AccountifyUI.toast('Could not save reaction', 'error');
+        loadAndRender();
+    });
 }
 
+// ── Comments ──────────────────────────────────────────────────────────────────
 function addComment(postId, content) {
     var me = Storage.getCurrentUser();
-    var post = Storage.getPosts().find(function (p) { return p.id === postId; });
+    var post = COMM_POSTS.find(function (p) { return p.id === postId; });
     if (!me || !post) return;
     var text = (content || '').trim();
     if (!text) return;
+    if (text.length < 1 || text.length > 1000) { AccountifyUI.toast('Comment must be 1–1000 characters', 'warning'); return; }
 
     post.comments = Array.isArray(post.comments) ? post.comments : [];
     post.comments.push({
         id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8),
         userId: me.id,
-        userName: me.fullName || me.name || 'Student',
+        userName: me.fullName || 'Student',
         content: text,
         createdAt: new Date().toISOString()
     });
-    post.updatedAt = new Date().toISOString();
-    Storage.savePost(post);
+
+    // Optimistic UI
     renderFeed();
     renderContributorLeaderboard();
-}
 
-function deletePost(postId) {
-    var me = Storage.getCurrentUser();
-    var post = Storage.getPosts().find(function (p) { return p.id === postId; });
-    if (!me || !post || post.userId !== me.id) return;
-    AccountifyUI.confirmDelete('Delete this post permanently?').then(function (ok) {
-        if (!ok) return;
-        Storage.deletePost(postId);
-        AccountifyUI.toast('Post deleted', 'success');
-        renderFeed();
-        renderContributorLeaderboard();
+    // Persist
+    SupabaseClient.savePost(post).catch(function () {
+        AccountifyUI.toast('Could not save comment', 'error');
+        loadAndRender();
     });
 }
 
-function getFilteredPosts() {
-    var posts = Storage.getPosts().slice();
-    posts = posts.filter(function (p) {
-        var okType = communityState.type === 'all' || p.type === communityState.type;
-        if (!okType) return false;
+// ── Delete post ───────────────────────────────────────────────────────────────
+function deletePost(postId) {
+    var me = Storage.getCurrentUser();
+    var post = COMM_POSTS.find(function (p) { return p.id === postId; });
+    if (!me || !post || post.userId !== me.id) return;
+    AccountifyUI.confirmDelete('Delete this post permanently?').then(function (ok) {
+        if (!ok) return;
+        SupabaseClient.deletePost(postId).then(function () {
+            COMM_POSTS = COMM_POSTS.filter(function (p) { return p.id !== postId; });
+            AccountifyUI.toast('Post deleted', 'success');
+            renderFeed();
+            renderContributorLeaderboard();
+        }).catch(function () {
+            AccountifyUI.toast('Failed to delete post', 'error');
+        });
+    });
+}
 
+// ── Filtering & sorting ───────────────────────────────────────────────────────
+function getFilteredPosts() {
+    var posts = COMM_POSTS.slice();
+
+    posts = posts.filter(function (p) {
+        if (communityState.type !== 'all' && p.type !== communityState.type) return false;
         if (communityState.tag) {
             var foundTag = (p.tags || []).some(function (t) {
                 return (t || '').toLowerCase().indexOf(communityState.tag) !== -1;
             });
             if (!foundTag) return false;
         }
-
-        if (!communityState.search) return true;
-        var hay = ((p.content || '') + ' ' + (p.tags || []).join(' ')).toLowerCase();
-        return hay.indexOf(communityState.search) !== -1;
+        if (communityState.search) {
+            var hay = ((p.content || '') + ' ' + (p.userName || '') + ' ' + (p.tags || []).join(' ')).toLowerCase();
+            if (hay.indexOf(communityState.search) === -1) return false;
+        }
+        return true;
     });
 
     posts.sort(function (a, b) {
@@ -327,126 +313,91 @@ function getFilteredPosts() {
         if (communityState.sort === 'mostComments') return (b.comments || []).length - (a.comments || []).length;
         return new Date(b.createdAt) - new Date(a.createdAt);
     });
+
     return posts;
 }
 
+// ── Render feed ───────────────────────────────────────────────────────────────
 function renderFeed() {
     var feed = document.getElementById('communityFeed');
     var posts = getFilteredPosts();
     var me = Storage.getCurrentUser();
 
     if (!posts.length) {
-        feed.innerHTML = '<div class="empty-state"><h3>No matching posts</h3><p>Try a different filter or create a new post.</p></div>';
+        feed.innerHTML = '<div class="empty-state"><h3>No matching posts</h3><p>Try a different filter or be the first to post!</p></div>';
         return;
     }
 
-    feed.innerHTML = posts
-        .map(function (p) {
-            var tags = (p.tags || [])
-                .map(function (t) {
-                    return '<button type="button" class="tag-pill" data-tag="' + escAttr(t) + '">#' + esc(t) + '</button>';
-                })
-                .join('');
+    feed.innerHTML = posts.map(function (p) {
+        var tags = (p.tags || []).map(function (t) {
+            return '<button type="button" class="tag-pill" data-tag="' + escAttr(t) + '">#' + esc(t) + '</button>';
+        }).join('');
 
-            var mine = me && p.userId === me.id;
-            var actionHtml = mine
-                ? '<div class="post-actions">' +
-                  '<button type="button" class="btn btn-outline post-edit-btn" data-id="' + escAttr(p.id) + '" style="padding:0.35rem 0.6rem;">Edit</button>' +
-                  '<button type="button" class="btn btn-outline post-del-btn" data-id="' + escAttr(p.id) + '" style="padding:0.35rem 0.6rem;">Delete</button>' +
-                  '</div>'
-                : '';
+        var mine = me && p.userId === me.id;
+        var actionHtml = mine
+            ? '<div class="post-actions">' +
+              '<button type="button" class="btn btn-outline post-edit-btn" data-id="' + escAttr(p.id) + '" style="padding:0.35rem 0.6rem;">Edit</button>' +
+              '<button type="button" class="btn btn-outline post-del-btn" data-id="' + escAttr(p.id) + '" style="padding:0.35rem 0.6rem;">Delete</button>' +
+              '</div>'
+            : '';
 
-            var mineReaction = me ? myReaction(p, me.id) : null;
-            function rxBtn(key, label) {
-                var active = mineReaction === key ? ' reaction-btn--active' : '';
-                var count = (p.reactions && p.reactions[key] ? p.reactions[key].length : 0);
-                return (
-                    '<button type="button" class="reaction-btn' +
-                    active +
-                    '" data-id="' +
-                    escAttr(p.id) +
-                    '" data-rx="' +
-                    escAttr(key) +
-                    '">' +
-                    label +
-                    ' <span class="reaction-count">' +
-                    esc(count) +
-                    '</span></button>'
-                );
-            }
+        var mineReaction = me ? myReaction(p, me.id) : null;
 
-            var comments = Array.isArray(p.comments) ? p.comments : [];
-            var commentList =
-                comments.length === 0
-                    ? '<div class="comment-empty">No comments yet.</div>'
-                    : comments
-                          .slice(-3)
-                          .map(function (c) {
-                              return (
-                                  '<div class="comment-row">' +
-                                  '<div class="comment-author">' +
-                                  esc(c.userName || 'Student') +
-                                  '</div>' +
-                                  '<div class="comment-body">' +
-                                  esc(c.content || '') +
-                                  '</div>' +
-                                  '</div>'
-                              );
-                          })
-                          .join('');
+        function rxBtn(key, label) {
+            var active = mineReaction === key ? ' reaction-btn--active' : '';
+            var count = (p.reactions && p.reactions[key] ? p.reactions[key].length : 0);
+            return '<button type="button" class="reaction-btn' + active + '" data-id="' + escAttr(p.id) + '" data-rx="' + escAttr(key) + '">' +
+                label + ' <span class="reaction-count">' + count + '</span></button>';
+        }
 
-            var moreComments = comments.length > 3 ? '<div class="comment-more">Showing latest 3 of ' + comments.length + ' comments.</div>' : '';
+        var comments = Array.isArray(p.comments) ? p.comments : [];
+        var commentList = comments.length === 0
+            ? '<div class="comment-empty">No comments yet. Be the first!</div>'
+            : comments.map(function (c) {
+                var isOwnComment = me && c.userId === me.id;
+                return '<div class="comment-row">' +
+                    '<div class="comment-author">' + esc(c.userName || 'Student') +
+                    (isOwnComment ? ' <span style="font-size:0.75rem;color:var(--text-secondary);">(you)</span>' : '') +
+                    '</div>' +
+                    '<div class="comment-body">' + esc(c.content || '') + '</div>' +
+                    '<div style="font-size:0.75rem;color:var(--text-secondary);">' + timeAgo(c.createdAt) + '</div>' +
+                    '</div>';
+            }).join('');
 
-            return (
-                '<article class="card community-post" data-post="' +
-                escAttr(p.id) +
-                '">' +
-                '<div class="post-head">' +
-                '<div class="post-avatar">' +
-                esc(initials(displayName(p))) +
-                '</div>' +
-                '<div class="post-meta">' +
-                '<div class="post-meta__top"><span class="post-author">' +
-                esc(displayName(p)) +
-                '</span><span class="post-type">' +
-                esc(p.type || 'Discussion') +
-                '</span></div>' +
-                '<div class="post-time">' +
-                esc(new Date(p.createdAt).toLocaleString()) +
-                '</div>' +
-                '</div>' +
-                '</div>' +
-                '<div class="post-content">' +
-                esc(p.content || '') +
-                '</div>' +
-                '<div class="post-tags">' +
-                tags +
-                '</div>' +
-                '<div class="post-reactions">' +
-                rxBtn('like', '👍 Like') +
-                rxBtn('love', '❤️ Love') +
-                rxBtn('laugh', '😂 Haha') +
-                rxBtn('helpful', '💡 Helpful') +
-                '</div>' +
-                actionHtml +
-                '<div class="post-comments">' +
-                '<div class="comment-list">' +
-                commentList +
-                '</div>' +
-                moreComments +
-                '<form class="comment-form" data-id="' +
-                escAttr(p.id) +
-                '">' +
-                '<input class="comment-input" name="comment" placeholder="Write a comment…" autocomplete="off" />' +
-                '<button class="btn btn-primary comment-submit" type="submit">Post</button>' +
-                '</form>' +
-                '</div>' +
-                '</article>'
-            );
-        })
-        .join('');
+        var moreComments = comments.length > 5
+            ? '<div class="comment-more">Showing all ' + comments.length + ' comments</div>'
+            : '';
 
-    // Tag chips -> quick filter
+        return '<article class="card community-post" data-post="' + escAttr(p.id) + '">' +
+            '<div class="post-head">' +
+            '<div class="post-avatar">' + esc(initials(p.userName || 'Student')) + '</div>' +
+            '<div class="post-meta">' +
+            '<div class="post-meta__top"><span class="post-author">' + esc(p.userName || 'Student') + '</span>' +
+            '<span class="post-type">' + esc(p.type || 'Discussion') + '</span></div>' +
+            '<div class="post-time">' + timeAgo(p.createdAt) + '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div class="post-content">' + esc(p.content || '') + '</div>' +
+            '<div class="post-tags">' + tags + '</div>' +
+            '<div class="post-reactions">' +
+            rxBtn('like', '👍 Like') +
+            rxBtn('love', '❤️ Love') +
+            rxBtn('laugh', '😂 Haha') +
+            rxBtn('helpful', '💡 Helpful') +
+            '</div>' +
+            actionHtml +
+            '<div class="post-comments">' +
+            '<div class="comment-list">' + commentList + '</div>' +
+            moreComments +
+            '<form class="comment-form" data-id="' + escAttr(p.id) + '">' +
+            '<input class="comment-input" name="comment" placeholder="Write a comment…" autocomplete="off" maxlength="1000" />' +
+            '<button class="btn btn-primary comment-submit" type="submit">Post</button>' +
+            '</form>' +
+            '</div>' +
+            '</article>';
+    }).join('');
+
+    // Tag chips → quick filter
     feed.querySelectorAll('.tag-pill').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var t = (btn.dataset.tag || '').trim();
@@ -459,12 +410,10 @@ function renderFeed() {
 
     // Reaction buttons
     feed.querySelectorAll('.reaction-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            toggleReaction(btn.dataset.id, btn.dataset.rx);
-        });
+        btn.addEventListener('click', function () { toggleReaction(btn.dataset.id, btn.dataset.rx); });
     });
 
-    // Comment submit
+    // Comment forms
     feed.querySelectorAll('.comment-form').forEach(function (form) {
         form.addEventListener('submit', function (e) {
             e.preventDefault();
@@ -474,74 +423,81 @@ function renderFeed() {
         });
     });
 
-    // Owner actions
+    // Edit / delete buttons
     feed.querySelectorAll('.post-edit-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            openPostModal(btn.dataset.id);
-        });
+        btn.addEventListener('click', function () { openPostModal(btn.dataset.id); });
     });
     feed.querySelectorAll('.post-del-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            deletePost(btn.dataset.id);
-        });
+        btn.addEventListener('click', function () { deletePost(btn.dataset.id); });
     });
 }
 
+// ── Contributor leaderboard ───────────────────────────────────────────────────
 function renderContributorLeaderboard() {
     var listEl = document.getElementById('communityContribList');
     if (!listEl) return;
-    var posts = Storage.getPosts();
 
     var scores = {};
-    posts.forEach(function (p) {
+    COMM_POSTS.forEach(function (p) {
         if (!p.userId || p.userId === 'system') return;
-        if (!scores[p.userId]) scores[p.userId] = { userId: p.userId, name: p.userName || 'Student', posts: 0, helpful: 0, total: 0 };
+        if (!scores[p.userId]) scores[p.userId] = { userId: p.userId, name: p.userName || 'Student', posts: 0, comments: 0, helpful: 0, total: 0 };
         scores[p.userId].posts += 1;
         scores[p.userId].helpful += (p.reactions && p.reactions.helpful ? p.reactions.helpful.length : 0);
-        scores[p.userId].name = scores[p.userId].name || p.userName || 'Student';
+        scores[p.userId].comments += (p.comments || []).filter(function (c) { return c.userId === p.userId; }).length;
+        scores[p.userId].name = p.userName || scores[p.userId].name;
     });
 
-    var sorted = Object.values(scores)
-        .map(function (s) {
-            s.total = s.posts * 3 + s.helpful * 2;
-            return s;
-        })
-        .sort(function (a, b) { return b.total - a.total; })
-        .slice(0, 5);
+    var sorted = Object.values(scores).map(function (s) {
+        s.total = s.posts * 3 + s.helpful * 2 + s.comments;
+        return s;
+    }).sort(function (a, b) { return b.total - a.total; }).slice(0, 5);
 
     if (!sorted.length) {
         listEl.innerHTML = '<p style="color:var(--text-secondary);margin:0;">No contributors yet. Create the first post!</p>';
         return;
     }
 
-    listEl.innerHTML = sorted
-        .map(function (s, idx) {
-            return (
-                '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0;border-bottom:1px solid var(--border);">' +
-                '<div><strong>#' +
-                (idx + 1) +
-                ' ' +
-                esc(s.name) +
-                '</strong><div style="font-size:0.85rem;color:var(--text-secondary);">Posts: ' +
-                s.posts +
-                ' • Helpful: ' +
-                s.helpful +
-                '</div></div>' +
-                '<div style="font-weight:800;color:var(--primary);">' +
-                s.total +
-                '</div>' +
-                '</div>'
-            );
-        })
-        .join('');
+    var medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+    listEl.innerHTML = sorted.map(function (s, idx) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0;border-bottom:1px solid var(--border);">' +
+            '<div><strong>' + medals[idx] + ' ' + esc(s.name) + '</strong>' +
+            '<div style="font-size:0.85rem;color:var(--text-secondary);">Posts: ' + s.posts + ' • Helpful: ' + s.helpful + ' • Comments: ' + s.comments + '</div></div>' +
+            '<div style="font-weight:800;color:var(--primary);">' + s.total + ' pts</div>' +
+            '</div>';
+    }).join('');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function countReactions(post) {
+    if (!post || !post.reactions) return 0;
+    return ['like', 'love', 'laugh', 'helpful'].reduce(function (sum, k) {
+        return sum + (Array.isArray(post.reactions[k]) ? post.reactions[k].length : 0);
+    }, 0);
+}
+
+function myReaction(post, userId) {
+    if (!post || !post.reactions) return null;
+    var keys = ['like', 'love', 'laugh', 'helpful'];
+    for (var i = 0; i < keys.length; i++) {
+        if (Array.isArray(post.reactions[keys[i]]) && post.reactions[keys[i]].indexOf(userId) !== -1) return keys[i];
+    }
+    return null;
+}
+
+function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    var diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    return new Date(dateStr).toLocaleDateString();
 }
 
 function initials(name) {
-    var s = (name || '').trim();
-    if (!s) return 'U';
-    var parts = s.split(/\s+/).filter(Boolean);
+    var parts = (name || '').trim().split(/\s+/).filter(Boolean);
     var a = (parts[0] || 'U').slice(0, 1).toUpperCase();
-    var b = parts.length > 1 ? (parts[parts.length - 1] || '').slice(0, 1).toUpperCase() : '';
+    var b = parts.length > 1 ? parts[parts.length - 1].slice(0, 1).toUpperCase() : '';
     return (a + b) || 'U';
 }
 
@@ -551,34 +507,29 @@ function esc(s) {
     return d.innerHTML;
 }
 
-// Additional security function for attribute values
 function escAttr(s) {
     return (s || '').toString()
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Validate post content
 function validatePostContent(content) {
     if (!content || typeof content !== 'string') return false;
-    if (content.length > 6000) return false;
-    if (content.length < 10) return false;
-    // Check for script tags and other dangerous content
+    if (content.length < 10 || content.length > 6000) return false;
     if (/<script|javascript:|on\w+=/i.test(content)) return false;
     return true;
 }
 
-// Validate tags
 function validateTags(tags) {
-    if (!Array.isArray(tags)) return false;
-    if (tags.length === 0 || tags.length > 5) return false;
-    return tags.every(tag => tag && typeof tag === 'string' && tag.length <= 20 && /^[a-zA-Z0-9\s\-]+$/.test(tag));
+    if (!Array.isArray(tags) || tags.length === 0 || tags.length > 5) return false;
+    return tags.every(function (tag) {
+        return tag && typeof tag === 'string' && tag.length <= 20 && /^[a-zA-Z0-9\s\-]+$/.test(tag);
+    });
 }
 
 function logout() {
-    Storage.logout();
-    window.location.href = 'login.html';
+    SupabaseClient.signOut().finally(function () {
+        Storage.logout();
+        window.location.replace('login.html');
+    });
 }
