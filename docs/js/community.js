@@ -242,8 +242,13 @@ function toggleReaction(postId, reactionKey) {
     renderFeed();
     renderContributorLeaderboard();
 
-    // Persist to Supabase
-    SupabaseClient.savePost(post).catch(function () {
+    // Persist only reactions column — works for any logged-in user
+    SupabaseClient.updateReactions(post.id, post.reactions).then(function(saved) {
+        if (!saved) {
+            AccountifyUI.toast('Could not save reaction', 'error');
+            loadAndRender();
+        }
+    }).catch(function () {
         AccountifyUI.toast('Could not save reaction', 'error');
         loadAndRender();
     });
@@ -271,8 +276,13 @@ function addComment(postId, content) {
     renderFeed();
     renderContributorLeaderboard();
 
-    // Persist
-    SupabaseClient.savePost(post).catch(function () {
+    // Persist only comments column — works for any logged-in user
+    SupabaseClient.updateComments(post.id, post.comments).then(function(saved) {
+        if (!saved) {
+            AccountifyUI.toast('Could not save comment', 'error');
+            loadAndRender();
+        }
+    }).catch(function () {
         AccountifyUI.toast('Could not save comment', 'error');
         loadAndRender();
     });

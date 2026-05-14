@@ -201,6 +201,26 @@ const SupabaseClient = {
         return data;
     },
 
+    // Update only reactions — any logged-in user can call this
+    updateReactions: async function (postId, reactions) {
+        const { data, error } = await _sb.from('posts')
+            .update({ reactions: reactions, updated_at: new Date().toISOString() })
+            .eq('id', postId)
+            .select().single();
+        if (error || !data) return null;
+        return data;
+    },
+
+    // Update only comments — any logged-in user can call this
+    updateComments: async function (postId, comments) {
+        const { data, error } = await _sb.from('posts')
+            .update({ comments: comments, updated_at: new Date().toISOString() })
+            .eq('id', postId)
+            .select().single();
+        if (error || !data) return null;
+        return data;
+    },
+
     deletePost: async function (postId) {
         const { error } = await _sb.from('posts').delete().eq('id', postId);
         return !error;
