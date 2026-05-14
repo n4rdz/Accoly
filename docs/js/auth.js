@@ -35,16 +35,25 @@ document.addEventListener('DOMContentLoaded', function () {
                      currentPage === 'index.html';
     var isProtectedPage = !isAuthPage && currentPage !== '';
 
-    // Skip auth check if we just logged in or signed up
+    // FIX: Don't remove overlay eagerly — wait for session + profile to load
+    // to prevent the flicker where the page renders unstyled before auth is confirmed
     if (sessionStorage.getItem('just-authed')) {
         sessionStorage.removeItem('just-authed');
-        removeOverlay();
+
         SupabaseClient.getSession().then(function (session) {
             if (session) {
                 SupabaseClient.getProfile(session.user.id).then(function (profile) {
                     if (profile) Storage.setCurrentUser(profile);
+                    removeOverlay(); // Remove AFTER profile is ready
+                }).catch(function () {
+                    removeOverlay(); // Safety fallback if profile fetch fails
                 });
+            } else {
+                // No valid session — redirect back to login
+                window.location.replace('login.html');
             }
+        }).catch(function () {
+            removeOverlay();
         });
         return;
     }
@@ -110,7 +119,9 @@ async function handleLogin() {
         const profile = await SupabaseClient.getProfile(session.user.id);
         if (profile) Storage.setCurrentUser(profile);
         sessionStorage.setItem('just-authed', '1');
-        setTimeout(function () { window.location.replace('dashboard.html'); }, 300);
+        // FIX: Redirect immediately — no setTimeout delay needed.
+        // The overlay on dashboard.html covers the load, so no flicker.
+        window.location.replace('dashboard.html');
     } catch (err) {
         console.error('Login error:', err);
         showError(errorDiv, 'Login failed. Please try again.');
@@ -181,7 +192,9 @@ async function handleSignup() {
         const profile = await SupabaseClient.getProfile(session.user.id);
         if (profile) Storage.setCurrentUser(profile);
         sessionStorage.setItem('just-authed', '1');
-        setTimeout(function () { window.location.replace('dashboard.html'); }, 300);
+        // FIX: Redirect immediately — no setTimeout delay needed.
+        // The overlay on dashboard.html covers the load, so no flicker.
+        window.location.replace('dashboard.html');
     } catch (err) {
         console.error('Signup error:', err);
         showError(errorDiv, 'Registration failed. Please try again.');
