@@ -6,8 +6,21 @@ var communityState = { sort: 'newest', search: '', type: 'all', tag: '' };
 var postModalState = { editingId: null };
 
 document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('authReady', initializePage);
+
+    // If auth already finished before this script loaded
+    if (window.__authReady) {
+        initializePage();
+    }
+});
+
+async function initializePage() {
     var user = Storage.getCurrentUser();
-    if (!user) return (window.location.href = 'login.html');
+
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
 
     seedCommunity();
     initComposer(user);
@@ -15,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
     bindPostModal();
     renderFeed();
     renderContributorLeaderboard();
-});
+}
 
 function initComposer(user) {
     var avatarEl = document.getElementById('composerAvatar');
