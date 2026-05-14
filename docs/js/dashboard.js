@@ -3,27 +3,25 @@
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication
-    const user = Storage.getCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
+    // auth.js handles all auth checks and redirects via onAuthStateChange.
+    // dashboard.js waits for the 'authReady' event before initializing,
+    // so Storage.getCurrentUser() is guaranteed to be populated.
+    if (window.__authReady) {
+        initDashboard();
+    } else {
+        window.addEventListener('authReady', function () {
+            initDashboard();
+        });
     }
-
-    // Initialize dashboard
-    initDashboard();
 });
 
 function initDashboard() {
     const user = Storage.getCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
-    }
-    
+    if (!user) return; // auth.js already redirected if no session; just bail silently
+
     const stats = Storage.getUserStats(user.id);
 
-    // Header user chip (nav-header also fills; keep in sync)
+    // Header user chip
     const initials = user.fullName
         .split(' ')
         .map(n => n[0])
@@ -39,23 +37,22 @@ function initDashboard() {
     let greeting = 'Good Morning';
     if (hour >= 12 && hour < 18) greeting = 'Good Afternoon';
     if (hour >= 18) greeting = 'Good Evening';
-    
+
     const welcomeEl = document.getElementById('welcomeMessage');
     const streakEl = document.getElementById('streakMessage');
     if (welcomeEl) welcomeEl.textContent = `${greeting}, ${user.fullName.split(' ')[0]}!`;
     if (streakEl) streakEl.textContent = `You have a ${stats.currentStreak || 0} day study streak. Keep it up! 🔥`;
 
-    // Update stats with proper validation
+    // Stats
     const levelName = Storage.getLevelName(stats.level);
     const progressEl = document.getElementById('overallProgress');
     const quizzesEl = document.getElementById('quizzesCompleted');
     const hoursEl = document.getElementById('studyHours');
     const levelEl = document.getElementById('currentLevel');
-    
+
     if (progressEl) progressEl.textContent = `${stats.accuracyPercentage || 0}%`;
     if (quizzesEl) quizzesEl.textContent = stats.totalQuizzes || 0;
     if (hoursEl) {
-        // Calculate actual study time from quiz attempts (assuming 10 minutes per quiz)
         const studyMinutes = (stats.totalQuizzes || 0) * 10;
         const studyHours = Math.floor(studyMinutes / 60);
         const studyMins = studyMinutes % 60;
@@ -63,7 +60,7 @@ function initDashboard() {
     }
     if (levelEl) levelEl.textContent = levelName;
 
-    // Count user content safely
+    // Notes / notepad counts
     try {
         const notesCount = Storage.getNotes(user.id).length;
         const notepadCount = Storage.getNotepadEntries(user.id).length;
@@ -75,14 +72,14 @@ function initDashboard() {
         console.error('Error counting user content:', error);
     }
 
-    // Load recent activity
+    // Recent activity
     loadRecentActivity(user.id);
 }
 
 function loadRecentActivity(userId) {
     const recentList = document.getElementById('recentActivityList');
     if (!recentList) return;
-    
+
     let attempts = [];
     try {
         attempts = Storage.getQuizAttempts(userId);
@@ -91,22 +88,20 @@ function loadRecentActivity(userId) {
         recentList.innerHTML = '<p style="color: var(--text-secondary);">Error loading activity.</p>';
         return;
     }
-    
+
     if (!attempts || attempts.length === 0) {
         recentList.innerHTML = '<p style="color: var(--text-secondary);">No recent activity. Start by taking a quiz!</p>';
         return;
     }
 
-    // Get 5 most recent and sort by timestamp
     const recent = attempts
         .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
         .slice(0, 5);
-    
+
     recentList.innerHTML = recent.map(attempt => {
         const score = attempt.score || 0;
         const subject = attempt.subject || 'Unknown';
         const date = attempt.timestamp ? new Date(attempt.timestamp).toLocaleDateString() : 'Unknown date';
-        
         return `
             <div class="activity-item">
                 <div class="activity-text">

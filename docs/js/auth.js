@@ -9,7 +9,7 @@
     var isAuthPage = currentPage.includes('login') ||
                      currentPage.includes('signup') ||
                      currentPage === 'index.html';
-    if (isAuthPage) return; // Don't show overlay on login/signup pages
+    if (isAuthPage) return;
     var overlay = document.createElement('div');
     overlay.id = 'auth-overlay';
     overlay.style.cssText = [
@@ -28,6 +28,9 @@ function removeOverlay() {
     if (el) el.remove();
 }
 
+// Global flag so other scripts (dashboard.js, etc.) know auth is ready
+window.__authReady = false;
+
 document.addEventListener('DOMContentLoaded', function () {
     var currentPage = window.location.pathname.split('/').pop() || 'index.html';
     var isAuthPage = currentPage.includes('login') ||
@@ -35,44 +38,37 @@ document.addEventListener('DOMContentLoaded', function () {
                      currentPage === 'index.html';
     var isProtectedPage = !isAuthPage && currentPage !== '';
 
-    // FIX: Don't remove overlay eagerly — wait for session + profile to load
-    // to prevent the flicker where the page renders unstyled before auth is confirmed
-    if (sessionStorage.getItem('just-authed')) {
-        sessionStorage.removeItem('just-authed');
+    var resolved = false;
 
-        SupabaseClient.getSession().then(function (session) {
-            if (session) {
-                SupabaseClient.getProfile(session.user.id).then(function (profile) {
-                    if (profile) Storage.setCurrentUser(profile);
-                    removeOverlay(); // Remove AFTER profile is ready
-                }).catch(function () {
-                    removeOverlay(); // Safety fallback if profile fetch fails
-                });
-            } else {
-                // No valid session — redirect back to login
-                window.location.replace('login.html');
-            }
-        }).catch(function () {
-            removeOverlay();
-        });
-        return;
-    }
+    _sb.auth.onAuthStateChange(function (event, session) {
+        if (resolved) return;
+        resolved = true;
 
-    SupabaseClient.getSession().then(function (session) {
-        if (session && isAuthPage && currentPage !== 'index.html') {
-            window.location.replace('dashboard.html');
-            return;
-        }
-        if (!session && isProtectedPage) {
-            window.location.replace('login.html');
-            return;
-        }
-        removeOverlay();
         if (session) {
+            if (isAuthPage && currentPage !== 'index.html') {
+                window.location.replace('dashboard.html');
+                return;
+            }
             SupabaseClient.getProfile(session.user.id).then(function (profile) {
                 if (profile) Storage.setCurrentUser(profile);
+                window.__authReady = true;
+                window.dispatchEvent(new Event('authReady'));
+                removeOverlay();
+            }).catch(function () {
+                window.__authReady = true;
+                window.dispatchEvent(new Event('authReady'));
+                removeOverlay();
             });
+        } else {
+            if (isProtectedPage) {
+                window.location.replace('login.html');
+                return;
+            }
+            window.__authReady = true;
+            window.dispatchEvent(new Event('authReady'));
+            removeOverlay();
         }
+
         var loginForm = document.getElementById('loginForm');
         if (loginForm) {
             loginForm.addEventListener('submit', function (e) {
@@ -87,9 +83,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 handleSignup();
             });
         }
-    }).catch(function () {
-        removeOverlay();
     });
+
+    // Safety fallback: if onAuthStateChange never fires within 3s
+    setTimeout(function () {
+        if (!resolved) {
+            resolved = true;
+            if (isProtectedPage) {
+                window.location.replace('login.html');
+            } else {
+                window.__authReady = true;
+                window.dispatchEvent(new Event('authReady'));
+                removeOverlay();
+            }
+        }
+    }, 3000);
 });
 
 
@@ -115,13 +123,9 @@ async function handleLogin() {
             }
             return;
         }
-
+        // onAuthStateChange fires and redirects automatically
         const profile = await SupabaseClient.getProfile(session.user.id);
         if (profile) Storage.setCurrentUser(profile);
-        sessionStorage.setItem('just-authed', '1');
-        // FIX: Redirect immediately — no setTimeout delay needed.
-        // The overlay on dashboard.html covers the load, so no flicker.
-        window.location.replace('dashboard.html');
     } catch (err) {
         console.error('Login error:', err);
         showError(errorDiv, 'Login failed. Please try again.');
@@ -136,7 +140,6 @@ async function handleSignup() {
     const confirmPassword = document.getElementById('confirmPassword').value;
     const errorDiv = document.getElementById('error-message');
 
-    // Validation
     if (!fullName || !email || !password || !confirmPassword) {
         showError(errorDiv, 'All fields are required.');
         if (!fullName) setFieldError('fullName', 'Full name is required.');
@@ -184,17 +187,13 @@ async function handleSignup() {
         }
 
         if (!session) {
-            // Email confirmation required
             showError(errorDiv, 'Check your email to confirm your account, then login.');
             return;
         }
 
+        // onAuthStateChange fires and redirects automatically
         const profile = await SupabaseClient.getProfile(session.user.id);
         if (profile) Storage.setCurrentUser(profile);
-        sessionStorage.setItem('just-authed', '1');
-        // FIX: Redirect immediately — no setTimeout delay needed.
-        // The overlay on dashboard.html covers the load, so no flicker.
-        window.location.replace('dashboard.html');
     } catch (err) {
         console.error('Signup error:', err);
         showError(errorDiv, 'Registration failed. Please try again.');
