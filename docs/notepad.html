@@ -11,7 +11,10 @@
 <body>
     <div class="dashboard-wrapper">
         <aside class="sidebar">
-            <div class="sidebar-logo"><h2>Accoly</h2></div>
+            <div class="sidebar-logo">
+                <h2>Accoly</h2>
+                <p style="font-size: 0.75rem; margin: 0; color: var(--text-secondary);">Accoly Technologies</p>
+            </div>
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
                 <a href="community.html" class="nav-item"><span class="nav-icon">🧑‍🤝‍🧑</span><span>Community</span></a>
@@ -125,5 +128,41 @@
     <script src="js/subscription.js"></script>
     <script src="js/offline.js"></script>
     <script src="js/notepad.js"></script>
+
+    <div id="noteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle">
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2 id="noteModalTitle">New Note</h2>
+                <button type="button" class="modal-close" id="noteModalClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="noteTitle">Title</label>
+                    <input type="text" id="noteTitle" class="form-input" placeholder="Note title" maxlength="200">
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="noteSubject">Subject</label>
+                    <select id="noteSubject" class="form-select"></select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                    <label for="noteContent">Content</label>
+                    <textarea id="noteContent" class="form-textarea" placeholder="Write your note…"></textarea>
+                </div>
+                <p class="autosave-indicator" id="autosaveStatus" aria-live="polite"></p>
+                <div class="note-pdf-row" id="notePdfRow" style="display:none;">
+                    <div class="note-pdf-meta" id="notePdfMeta"></div>
+                    <div class="note-pdf-actions">
+                        <button type="button" class="btn btn-outline" id="noteViewPdfBtn">View PDF</button>
+                        <button type="button" class="btn btn-outline" id="noteDetachPdfBtn">Detach</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="noteDeleteBtn" style="display: none; margin-right: auto;">Delete</button>
+                <button type="button" class="btn btn-outline" id="noteCancelBtn">Close</button>
+                <button type="button" class="btn btn-primary" id="noteSaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
