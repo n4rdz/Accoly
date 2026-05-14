@@ -20,12 +20,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-async function initQuizCenter() {
-    const userId = await SupabaseClient.getCurrentUserId();
-    if (!userId) {
-        window.location.href = 'login.html';
-        return;
-    }
+function initQuizCenter() {
+    const user = Storage.getCurrentUser();
+    if (!user) return; // auth.js already redirected
+
     loadQuizModules();
 }
 
@@ -36,11 +34,9 @@ function esc(s) {
     return d.innerHTML;
 }
 
-async function loadQuizModules() {
+function loadQuizModules() {
     const modulesContainer = document.getElementById('quizModules');
-    const userId = await SupabaseClient.getCurrentUserId();
-    const profile = await SupabaseClient.getProfile(userId);
-    const premium = profile && profile.subscriptionStatus === 'premium';
+    const premium = window.AccolySubscription ? AccolySubscription.isPremiumUser() : false;
     
     modulesContainer.innerHTML = QUIZ_MODULES.map(module => `
         <div class="quiz-module">
@@ -116,27 +112,16 @@ function filterQuizzes(difficulty, evt) {
     }
 }
 
-async function startQuiz(moduleId) {
+function startQuiz(moduleId) {
     // Offline quizzes: Premium-only
     if (navigator && navigator.onLine === false) {
-        const userId = await SupabaseClient.getCurrentUserId();
-        const profile = await SupabaseClient.getProfile(userId);
-        if (!profile || profile.subscriptionStatus !== 'premium') {
-            alert('Offline quizzes are premium-only. Subscribe to unlock!');
-            return;
-        }
+        if (!checkPremiumAccess('Offline quizzes')) return;
     }
 
     currentQuizModule = QUIZ_MODULES.find(m => m.id === moduleId);
     if (currentQuizModule && currentQuizModule.difficulty === 'Super Hard') {
-        const userId = await SupabaseClient.getCurrentUserId();
-        const profile = await SupabaseClient.getProfile(userId);
-        if (!profile || profile.subscriptionStatus !== 'premium') {
-            alert('Super Hard quizzes are premium-only. Subscribe to unlock!');
-            return;
-        }
+        if (!checkPremiumAccess('Super Hard quizzes')) return;
     }
-    
     currentQuestions = QUIZ_QUESTIONS[moduleId];
     
     // Shuffle questions
@@ -290,95 +275,53 @@ function exitQuiz() {
     }
 }
 
-async function submitQuiz() {
+function submitQuiz() {
     clearInterval(quizTimerInterval);
 
-    try {
-        // Calculate score
-        let correctCount = 0;
-        for (let i = 0; i < currentQuestions.length; i++) {
-            const question = currentQuestions[i];
-            const selected = selectedAnswers[i];
-            if (selected === question.correctAnswer) {
-                correctCount++;
-            }
+    // Calculate score
+    let correctCount = 0;
+    for (let i = 0; i < currentQuestions.length; i++) {
+        if (selectedAnswers[i] === currentQuestions[i].correct) {
+            correctCount++;
         }
-
-        const score = Math.round((correctCount / currentQuestions.length) * 100);
-        const timeTaken = Math.floor((Date.now() - quizStartTime) / 1000);
-        
-        // Calculate XP based on difficulty and accuracy
-        let xpEarned = 10;
-        if (currentQuizModule.difficulty === 'Easy') xpEarned = 10;
-        else if (currentQuizModule.difficulty === 'Medium') xpEarned = 20;
-        else if (currentQuizModule.difficulty === 'Hard') xpEarned = 30;
-        else if (currentQuizModule.difficulty === 'Super Hard') xpEarned = 50;
-        
-        // Bonus for accuracy
-        if (score >= 90) xpEarned = Math.round(xpEarned * 1.5);
-        else if (score >= 80) xpEarned = Math.round(xpEarned * 1.25);
-
-        // Get current user
-        const userId = await SupabaseClient.getCurrentUserId();
-        const profile = await SupabaseClient.getProfile(userId);
-
-        // Save attempt to Supabase
-        const attempt = {
-            userId: userId,
-            subject: currentQuizModule.name,
-            difficulty: currentQuizModule.difficulty,
-            score: score,
-            correctAnswers: correctCount,
-            totalQuestions: currentQuestions.length,
-            xpEarned: xpEarned
-        };
-        
-        const savedAttempt = await SupabaseClient.saveQuizAttempt(attempt);
-        
-        if (savedAttempt) {
-            // Get existing stats
-            const stats = await SupabaseClient.getUserStats(userId);
-            
-            // Update stats
-            const updatedStats = {
-                totalQuizzes: (stats.totalQuizzes || 0) + 1,
-                totalXP: (stats.totalXP || 0) + xpEarned,
-                accuracyPercentage: calculateAverageAccuracy(stats.accuracyPercentage, score, stats.totalQuizzes),
-                currentStreak: score >= 70 ? (stats.currentStreak || 0) + 1 : 0,
-                bestScore: Math.max(stats.bestScore || 0, score),
-                level: calculateLevel((stats.totalXP || 0) + xpEarned),
-                lastAttemptDate: new Date().toISOString()
-            };
-            
-            await SupabaseClient.saveUserStats(userId, updatedStats);
-            
-            // Update leaderboard
-            await SupabaseClient.updateLeaderboard(userId, profile.fullName, updatedStats);
-            
-            // Show results
-            showResults(score, correctCount, timeTaken, xpEarned, updatedStats);
-        }
-    } catch (error) {
-        console.error('Error submitting quiz:', error);
-        alert('Error submitting quiz. Please try again.');
     }
+
+    const score = Math.round((correctCount / currentQuestions.length) * 100);
+    const timeTaken = Math.floor((Date.now() - quizStartTime) / 1000);
+    const xpEarned = Storage.calculateXP({
+        difficulty: currentQuizModule.difficulty,
+        correctAnswers: correctCount,
+        totalQuestions: currentQuestions.length,
+        score: score
+    });
+
+    // Save attempt
+    const user = Storage.getCurrentUser();
+    const attempt = {
+        userId: user.id,
+        subject: currentQuizModule.subject,
+        difficulty: currentQuizModule.difficulty,
+        score: score,
+        correctAnswers: correctCount,
+        totalQuestions: currentQuestions.length,
+        timeTaken: timeTaken,
+        xpEarned: xpEarned
+    };
+    Storage.saveQuizAttempt(attempt);
+
+    Storage.addNotification({
+        userId: user.id,
+        message: 'You completed the ' + currentQuizModule.name + ' quiz! Score: ' + score + '%'
+    });
+    if (window.AccountifyNav) {
+        AccountifyNav.refreshNotifications();
+    }
+
+    // Show results
+    showResults(score, correctCount, timeTaken, xpEarned);
 }
 
-function calculateAverageAccuracy(previousAccuracy, newScore, previousCount) {
-    if (!previousCount || previousCount === 0) return newScore;
-    return Math.round(((previousAccuracy * previousCount) + newScore) / (previousCount + 1));
-}
-
-function calculateLevel(totalXP) {
-    if (totalXP < 100) return 1;
-    if (totalXP < 300) return 2;
-    if (totalXP < 600) return 3;
-    if (totalXP < 1000) return 4;
-    if (totalXP < 1500) return 5;
-    return Math.floor(totalXP / 500);
-}
-
-function showResults(score, correctCount, timeTaken, xpEarned, stats) {
+function showResults(score, correctCount, timeTaken, xpEarned) {
     document.getElementById('quizSelection').style.display = 'none';
     document.getElementById('quizTaking').style.display = 'none';
     document.getElementById('quizResults').style.display = 'block';
@@ -400,16 +343,6 @@ function showResults(score, correctCount, timeTaken, xpEarned, stats) {
     document.getElementById('correctCount').textContent = `${correctCount}/${currentQuestions.length}`;
     document.getElementById('timeTaken').textContent = `${minutes}m ${seconds}s`;
     document.getElementById('xpEarned').textContent = xpEarned + ' XP';
-    
-    // Display new stats if available
-    if (stats) {
-        if (document.getElementById('newLevel')) {
-            document.getElementById('newLevel').textContent = 'Level ' + stats.level;
-        }
-        if (document.getElementById('totalXP')) {
-            document.getElementById('totalXP').textContent = stats.totalXP + ' Total XP';
-        }
-    }
 
     // Score message
     const scoreMessage = document.getElementById('scoreMessage');
@@ -418,7 +351,7 @@ function showResults(score, correctCount, timeTaken, xpEarned, stats) {
     else if (score >= 70) scoreMessage.textContent = 'Good effort! Keep practicing! 💪';
     else scoreMessage.textContent = 'Keep studying and try again! 📚';
 
-    // Keep a snapshot for explanations
+    // Keep a snapshot for premium explanations
     lastQuizSnapshot = {
         module: currentQuizModule,
         questions: currentQuestions,
@@ -429,13 +362,8 @@ function showResults(score, correctCount, timeTaken, xpEarned, stats) {
     var panel = document.getElementById('explanationsPanel');
     if (panel) panel.innerHTML = '';
     if (btnExplain) {
-        btnExplain.onclick = async function () {
-            const userId = await SupabaseClient.getCurrentUserId();
-            const profile = await SupabaseClient.getProfile(userId);
-            if (!profile || profile.subscriptionStatus !== 'premium') {
-                alert('Advanced quiz explanations are premium-only. Subscribe to unlock!');
-                return;
-            }
+        btnExplain.onclick = function () {
+            if (!checkPremiumAccess('Advanced quiz explanations')) return;
             renderExplanations();
         };
     }
@@ -449,7 +377,7 @@ function renderExplanations() {
     panel.innerHTML = qs
         .map(function (q, idx) {
             var your = ans[idx];
-            var correct = q.correctAnswer;
+            var correct = q.correct;
             var ok = your === correct;
             return (
                 '<div class="card" style="margin:0.5rem 0;background:var(--surface);">' +
@@ -483,7 +411,7 @@ function backToQuizList() {
     loadQuizModules();
 }
 
-async function logout() {
-    await SupabaseClient.signOut();
+function logout() {
+    Storage.logout();
     window.location.href = 'login.html';
 }
