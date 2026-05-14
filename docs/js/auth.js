@@ -23,22 +23,24 @@ function removeOverlay() {
     if (el) el.remove();
 }
 
-ddocument.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function () {
     var currentPage = window.location.pathname.split('/').pop() || 'index.html';
     var isAuthPage = currentPage.includes('login') ||
                      currentPage.includes('signup') ||
                      currentPage === 'index.html';
     var isProtectedPage = !isAuthPage && currentPage !== '';
 
-    // Skip auth check if we just signed up or logged in
+    // Skip auth check if we just logged in or signed up
     if (sessionStorage.getItem('just-authed')) {
         sessionStorage.removeItem('just-authed');
         removeOverlay();
-        if (session) {
-            SupabaseClient.getProfile(session.user.id).then(function (profile) {
-                if (profile) Storage.setCurrentUser(profile);
-            });
-        }
+        SupabaseClient.getSession().then(function (session) {
+            if (session) {
+                SupabaseClient.getProfile(session.user.id).then(function (profile) {
+                    if (profile) Storage.setCurrentUser(profile);
+                });
+            }
+        });
         return;
     }
 
@@ -100,10 +102,10 @@ async function handleLogin() {
             return;
         }
 
-        const profile = await SupabaseClient.getProfile(session.user.id);   
+        const profile = await SupabaseClient.getProfile(session.user.id);
         if (profile) Storage.setCurrentUser(profile);
-       sessionStorage.setItem('just-signed-up', '1');
-        setTimeout(function () { window.location.replace('dashboard.html'); }, 500);
+        sessionStorage.setItem('just-authed', '1');
+        setTimeout(function () { window.location.replace('dashboard.html'); }, 300);
     } catch (err) {
         console.error('Login error:', err);
         showError(errorDiv, 'Login failed. Please try again.');
@@ -173,7 +175,8 @@ async function handleSignup() {
 
         const profile = await SupabaseClient.getProfile(session.user.id);
         if (profile) Storage.setCurrentUser(profile);
-        setTimeout(function () { window.location.replace('dashboard.html'); }, 500);
+        sessionStorage.setItem('just-authed', '1');
+        setTimeout(function () { window.location.replace('dashboard.html'); }, 300);
     } catch (err) {
         console.error('Signup error:', err);
         showError(errorDiv, 'Registration failed. Please try again.');
