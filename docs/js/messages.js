@@ -1,5 +1,9 @@
 var MSG = { activeUserId: null, activeGroupId: null };
 
+// In-memory caches
+var MSG_ALL_USERS = [];
+var MSG_CONVO_CACHE = [];
+
 document.addEventListener('DOMContentLoaded', function () {
     if (window.__authReady) {
         initMessages();
@@ -8,17 +12,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// Cache of all users fetched from Supabase
-var MSG_ALL_USERS = [];
-
 function initMessages() {
     var user = Storage.getCurrentUser();
-    if (!user) return; // auth.js already redirected
+    if (!user) return;
 
     bindPremiumLocks();
     bindChatActions();
 
-    // Load all users from Supabase first, then render everything
     SupabaseClient.getAllUsers().then(function (users) {
         MSG_ALL_USERS = users || [];
         initUserPicker();
@@ -31,12 +31,17 @@ function initMessages() {
         renderGroupList();
     });
 
+    // Poll for new messages every 5 seconds
+    setInterval(function () {
+        if (MSG.activeUserId) refreshActiveChat();
+    }, 5000);
+
+    // Groups still use localStorage
     window.addEventListener('storage', function (e) {
         if (!e || !e.key) return;
-        if (e.key === 'messages' || e.key === 'groupMessages' || e.key === 'groups') {
-            renderConversationList();
+        if (e.key === 'groupMessages' || e.key === 'groups') {
             renderGroupList();
-            renderChat();
+            if (MSG.activeGroupId) renderChat();
         }
     });
 }
@@ -49,14 +54,14 @@ function allUsersExceptMe() {
 function initUserPicker() {
     var picker = document.getElementById('msgUserPicker');
     var others = allUsersExceptMe();
-    picker.innerHTML = '<option value="">Select student…</option>';
+    picker.innerHTML = '<option value="">Select student...</option>';
     if (others.length === 0) {
-        picker.innerHTML = '<option value="">No other students found</option>';
+        picker.innerHTML += '<option value="" disabled>No other students found</option>';
     }
     others.forEach(function (u) {
         var o = document.createElement('option');
         o.value = u.id;
-        o.textContent = u.fullName + (u.subscriptionStatus === 'premium' ? ' ★' : '');
+        o.textContent = u.fullName + (u.subscriptionStatus === 'premium' ? ' *' : '');
         picker.appendChild(o);
     });
     document.getElementById('btnStartChat').addEventListener('click', function () {
@@ -68,57 +73,44 @@ function initUserPicker() {
 
 function renderConversationList() {
     var me = Storage.getCurrentUser();
-    var users = MSG_ALL_USERS;
-    var msgs = Storage.getMessages();
-
-    var partnerIds = {};
-    msgs.forEach(function (m) {
-        if (m.fromUserId === me.id) partnerIds[m.toUserId] = true;
-        if (m.toUserId === me.id) partnerIds[m.fromUserId] = true;
-    });
-
-    var partners = Object.keys(partnerIds)
-        .map(function (id) { return users.find(function (u) { return u.id === id; }); })
-        .filter(Boolean)
-        .map(function (u) {
-            var convo = Storage.getConversation(me.id, u.id);
-            var last = convo[convo.length - 1];
-            return { user: u, last: last };
-        })
-        .sort(function (a, b) {
-            return new Date(b.last.createdAt).getTime() - new Date(a.last.createdAt).getTime();
-        });
-
     var list = document.getElementById('conversationList');
-    if (!partners.length) {
-        list.innerHTML = '<p style="color:var(--text-secondary);margin:0;">No conversations yet. Start one above.</p>';
-        return;
-    }
-    list.innerHTML = partners
-        .map(function (p) {
-            var preview = (p.last.body || '').slice(0, 60);
-            return (
-                '<button type="button" class="conv-item ' +
-                (MSG.activeUserId === p.user.id ? 'active' : '') +
-                '" data-id="' +
-                p.user.id +
-                '">' +
-                '<div style="font-weight:700;color:var(--text-primary);">' +
-                esc(p.user.fullName) +
-                '</div>' +
-                '<div style="font-size:0.85rem;color:var(--text-secondary);">' +
-                esc(preview) +
-                '</div>' +
-                '</button>'
-            );
-        })
-        .join('');
+    list.innerHTML = '<p style="color:var(--text-secondary);margin:0;">Loading...</p>';
 
-    list.querySelectorAll('.conv-item').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            openChat(btn.dataset.id);
+    _sb.from('messages').select('*')
+        .or('from_user_id.eq.' + me.id + ',to_user_id.eq.' + me.id)
+        .order('created_at', { ascending: false })
+        .then(function (result) {
+            var msgs = (result && result.data) ? result.data : [];
+            var partnerMap = {};
+            msgs.forEach(function (m) {
+                var partnerId = m.from_user_id === me.id ? m.to_user_id : m.from_user_id;
+                if (!partnerMap[partnerId]) partnerMap[partnerId] = m;
+            });
+
+            var partnerIds = Object.keys(partnerMap);
+            if (!partnerIds.length) {
+                list.innerHTML = '<p style="color:var(--text-secondary);margin:0;">No conversations yet. Start one above.</p>';
+                return;
+            }
+
+            list.innerHTML = partnerIds.map(function (id) {
+                var user = MSG_ALL_USERS.find(function (u) { return u.id === id; });
+                var name = user ? user.fullName : 'Student';
+                var preview = (partnerMap[id].body || '').slice(0, 60);
+                return '<button type="button" class="conv-item ' +
+                    (MSG.activeUserId === id ? 'active' : '') +
+                    '" data-id="' + id + '">' +
+                    '<div style="font-weight:700;color:var(--text-primary);">' + esc(name) + '</div>' +
+                    '<div style="font-size:0.85rem;color:var(--text-secondary);">' + esc(preview) + '</div>' +
+                    '</button>';
+            }).join('');
+
+            list.querySelectorAll('.conv-item').forEach(function (btn) {
+                btn.addEventListener('click', function () { openChat(btn.dataset.id); });
+            });
+        }).catch(function () {
+            list.innerHTML = '<p style="color:var(--text-secondary);margin:0;">Could not load conversations.</p>';
         });
-    });
 }
 
 function openChat(otherUserId) {
@@ -127,6 +119,7 @@ function openChat(otherUserId) {
     var other = MSG_ALL_USERS.find(function (u) { return u.id === otherUserId; });
     document.getElementById('chatTitle').textContent = other ? other.fullName : 'Conversation';
     document.getElementById('chatSubtitle').textContent = other && other.subscriptionStatus === 'premium' ? 'Premium student' : 'Basic student';
+    MSG_CONVO_CACHE = [];
     renderChat();
     renderConversationList();
 }
@@ -145,35 +138,54 @@ function openGroup(groupId) {
 function renderChat() {
     var me = Storage.getCurrentUser();
     var chat = document.getElementById('chatMessages');
+
     if (!MSG.activeUserId && !MSG.activeGroupId) {
         chat.innerHTML = '<div class="empty-state"><h3>No chat selected</h3><p>Start or select a conversation.</p></div>';
         return;
     }
-    var convo = MSG.activeGroupId
-        ? Storage.getGroupConversation(MSG.activeGroupId)
-        : Storage.getConversation(me.id, MSG.activeUserId);
-    if (!convo.length) {
+
+    if (MSG.activeGroupId) {
+        var convo = Storage.getGroupConversation(MSG.activeGroupId);
+        renderMessages(chat, convo, me.id);
+        return;
+    }
+
+    chat.innerHTML = '<p style="color:var(--text-secondary);margin:0;">Loading...</p>';
+    SupabaseClient.getMessages(me.id, MSG.activeUserId).then(function (msgs) {
+        MSG_CONVO_CACHE = msgs || [];
+        renderMessages(chat, MSG_CONVO_CACHE, me.id);
+    }).catch(function () {
+        chat.innerHTML = '<p style="color:var(--text-secondary);">Could not load messages.</p>';
+    });
+}
+
+function refreshActiveChat() {
+    var me = Storage.getCurrentUser();
+    if (!me || !MSG.activeUserId) return;
+    SupabaseClient.getMessages(me.id, MSG.activeUserId).then(function (msgs) {
+        if (!msgs || msgs.length === MSG_CONVO_CACHE.length) return;
+        MSG_CONVO_CACHE = msgs;
+        var chat = document.getElementById('chatMessages');
+        renderMessages(chat, MSG_CONVO_CACHE, me.id);
+        renderConversationList();
+    }).catch(function () {});
+}
+
+function renderMessages(chat, convo, myId) {
+    if (!convo || !convo.length) {
         chat.innerHTML = '<p style="color:var(--text-secondary);margin:0;">Say hi to start the conversation.</p>';
         return;
     }
-    chat.innerHTML = convo
-        .map(function (m) {
-            var mine = m.fromUserId === me.id;
-            return (
-                '<div class="chat-row ' +
-                (mine ? 'mine' : 'theirs') +
-                '">' +
-                '<div class="chat-bubble">' +
-                (MSG.activeGroupId ? '<div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.25rem;">' + esc(displayName(m.fromUserId)) + '</div>' : '') +
-                esc(m.body) +
-                '<div class="chat-time">' +
-                new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
-                '</div>' +
-                '</div>' +
-                '</div>'
-            );
-        })
-        .join('');
+    chat.innerHTML = convo.map(function (m) {
+        var mine = m.fromUserId === myId;
+        return '<div class="chat-row ' + (mine ? 'mine' : 'theirs') + '">' +
+            '<div class="chat-bubble">' +
+            (MSG.activeGroupId ? '<div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.25rem;">' + esc(displayName(m.fromUserId)) + '</div>' : '') +
+            esc(m.body) +
+            '<div class="chat-time">' +
+            new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
+            '</div></div></div>';
+    }).join('');
     chat.scrollTop = chat.scrollHeight;
 }
 
@@ -188,72 +200,43 @@ function renderGroupList() {
         listEl.innerHTML = '<p style="color:var(--text-secondary);margin:0;">No groups yet. Premium users can create one.</p>';
         return;
     }
-    listEl.innerHTML = groups
-        .map(function (g) {
-            return '<button type="button" class="conv-item ' + (MSG.activeGroupId === g.id ? 'active' : '') + '" data-gid="' + g.id + '">' +
-                '<div style="font-weight:800;color:var(--text-primary);">' + esc(g.name) + '</div>' +
-                '<div style="font-size:0.85rem;color:var(--text-secondary);">' + esc(g.subject || 'General') + '</div>' +
-                '</button>';
-        })
-        .join('');
+    listEl.innerHTML = groups.map(function (g) {
+        return '<button type="button" class="conv-item ' + (MSG.activeGroupId === g.id ? 'active' : '') + '" data-gid="' + g.id + '">' +
+            '<div style="font-weight:800;color:var(--text-primary);">' + esc(g.name) + '</div>' +
+            '<div style="font-size:0.85rem;color:var(--text-secondary);">' + esc(g.subject || 'General') + '</div>' +
+            '</button>';
+    }).join('');
     listEl.querySelectorAll('[data-gid]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            openGroup(btn.dataset.gid);
-        });
+        btn.addEventListener('click', function () { openGroup(btn.dataset.gid); });
     });
 }
 
 function bindChatActions() {
     document.getElementById('btnSendMsg').addEventListener('click', sendMessage);
     document.getElementById('chatInput').addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
 }
 
 function sendMessage() {
     var me = Storage.getCurrentUser();
-    if (!me) {
-        AccountifyUI.toast('Please login to send messages', 'error');
-        return;
-    }
-    
-    if (!MSG.activeUserId && !MSG.activeGroupId) {
-        AccountifyUI.toast('Select a conversation first', 'warning');
-        return;
-    }
-    
+    if (!me) { AccountifyUI.toast('Please login to send messages', 'error'); return; }
+    if (!MSG.activeUserId && !MSG.activeGroupId) { AccountifyUI.toast('Select a conversation first', 'warning'); return; }
+
     var input = document.getElementById('chatInput');
+    var sendBtn = document.getElementById('btnSendMsg');
     var body = (input.value || '').trim();
-    
-    // Input validation
     if (!body) return;
-    if (body.length > 1000) {
-        AccountifyUI.toast('Message too long (max 1000 characters)', 'warning');
-        return;
-    }
-    
-    // Check for script injection
-    if (/<script|javascript:|on\w+=/i.test(body)) {
-        AccountifyUI.toast('Invalid content detected', 'error');
-        return;
-    }
+    if (body.length > 1000) { AccountifyUI.toast('Message too long (max 1000 characters)', 'warning'); return; }
+    if (/<script|javascript:|on\w+=/i.test(body)) { AccountifyUI.toast('Invalid content detected', 'error'); return; }
 
-    try {
-        if (MSG.activeGroupId) {
+    input.disabled = true;
+    sendBtn.disabled = true;
+
+    if (MSG.activeGroupId) {
+        try {
             Storage.saveGroupMessage({ groupId: MSG.activeGroupId, fromUserId: me.id, body: body });
-        } else {
-            Storage.saveMessage({ fromUserId: me.id, toUserId: MSG.activeUserId, body: body });
-        }
-        input.value = '';
-
-        if (!MSG.activeGroupId) {
-            Storage.addNotification({ userId: MSG.activeUserId, message: 'New message from ' + esc(me.fullName) });
-            if (window.AccountifyNav) AccountifyNav.refreshNotifications();
-        } else {
-            // notify all other members (best-effort)
+            input.value = '';
             var g = Storage.getGroups().find(function (x) { return x.id === MSG.activeGroupId; });
             if (g && Array.isArray(g.memberIds)) {
                 g.memberIds.forEach(function (id) {
@@ -262,14 +245,36 @@ function sendMessage() {
                 });
                 if (window.AccountifyNav) AccountifyNav.refreshNotifications();
             }
+            renderChat();
+            renderGroupList();
+        } catch (err) {
+            AccountifyUI.toast('Failed to send message', 'error');
+        } finally {
+            input.disabled = false;
+            sendBtn.disabled = false;
         }
-        renderChat();
-        renderConversationList();
-        renderGroupList();
-    } catch (error) {
-        console.error('Send message error:', error);
-        AccountifyUI.toast('Failed to send message', 'error');
+        return;
     }
+
+    // Direct message via Supabase
+    SupabaseClient.saveMessage({ fromUserId: me.id, toUserId: MSG.activeUserId, body: body })
+        .then(function (saved) {
+            if (!saved) { AccountifyUI.toast('Failed to send message', 'error'); return; }
+            input.value = '';
+            MSG_CONVO_CACHE.push(saved);
+            var chat = document.getElementById('chatMessages');
+            renderMessages(chat, MSG_CONVO_CACHE, me.id);
+            renderConversationList();
+            SupabaseClient.addNotification({ userId: MSG.activeUserId, message: 'New message from ' + me.fullName }).catch(function () {});
+        })
+        .catch(function () {
+            AccountifyUI.toast('Failed to send message', 'error');
+        })
+        .finally(function () {
+            input.disabled = false;
+            sendBtn.disabled = false;
+            input.focus();
+        });
 }
 
 function bindPremiumLocks() {
@@ -304,6 +309,8 @@ function esc(s) {
 }
 
 function logout() {
-    Storage.logout();
-    window.location.href = 'login.html';
+    SupabaseClient.signOut().finally(function () {
+        Storage.logout();
+        window.location.replace('login.html');
+    });
 }
