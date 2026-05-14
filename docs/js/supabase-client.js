@@ -1,11 +1,6 @@
 // ============================================
 // SUPABASE CLIENT — singleton wrapper
 // ============================================
-// Must be loaded BEFORE auth.js and storage.js
-// Add to every HTML page <head>:
-//   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-//   <script src="js/supabase-client.js"></script>
-
 const SUPABASE_URL = 'https://ftfgguwgtccqemwlutmv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_TsCJhb7DQcebE70q7dG2WA_S5aWD_ut';
 
@@ -19,6 +14,9 @@ const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     }
 });
 
+// Expose raw client globally so auth.js can use onAuthStateChange
+window._sb = _sb;
+
 const SupabaseClient = {
 
     // ── Auth ────────────────────────────────────────────────────────────────
@@ -31,7 +29,6 @@ const SupabaseClient = {
         });
         if (error) return { session: null, error };
 
-        // Insert profile row immediately (also handled by DB trigger as backup)
         if (data.user) {
             await _sb.from('profiles').upsert({
                 id: data.user.id,
@@ -70,7 +67,6 @@ const SupabaseClient = {
     getProfile: async function (userId) {
         const { data, error } = await _sb.from('profiles').select('*').eq('id', userId).single();
         if (error || !data) return null;
-        // Map to legacy shape so the rest of the app works unchanged
         return {
             id: data.id,
             fullName: data.full_name || 'Student',
@@ -79,7 +75,6 @@ const SupabaseClient = {
             subscriptionStatus: data.subscription_status || 'free',
             subscriptionDate: data.subscription_date || null,
             createdAt: data.created_at || new Date().toISOString(),
-            // keep password out of client storage
             password: ''
         };
     },
