@@ -23,38 +23,40 @@ function removeOverlay() {
     if (el) el.remove();
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+ddocument.addEventListener('DOMContentLoaded', function () {
     var currentPage = window.location.pathname.split('/').pop() || 'index.html';
     var isAuthPage = currentPage.includes('login') ||
                      currentPage.includes('signup') ||
                      currentPage === 'index.html';
     var isProtectedPage = !isAuthPage && currentPage !== '';
 
-    SupabaseClient.getSession().then(function (session) {
-
-        // Logged in but on login/signup → go to dashboard
-        if (session && isAuthPage && currentPage !== 'index.html') {
-            window.location.replace('dashboard.html');
-            return;
-        }
-
-        // Not logged in but on protected page → go to login
-        if (!session && isProtectedPage) {
-            window.location.replace('login.html');
-            return;
-        }
-
-        // Auth check passed — remove overlay and show page
+    // Skip auth check if we just signed up or logged in
+    if (sessionStorage.getItem('just-authed')) {
+        sessionStorage.removeItem('just-authed');
         removeOverlay();
-
-        // Sync profile to localStorage for legacy compatibility
         if (session) {
             SupabaseClient.getProfile(session.user.id).then(function (profile) {
                 if (profile) Storage.setCurrentUser(profile);
             });
         }
+        return;
+    }
 
-        // Bind forms AFTER auth check passes
+    SupabaseClient.getSession().then(function (session) {
+        if (session && isAuthPage && currentPage !== 'index.html') {
+            window.location.replace('dashboard.html');
+            return;
+        }
+        if (!session && isProtectedPage) {
+            window.location.replace('login.html');
+            return;
+        }
+        removeOverlay();
+        if (session) {
+            SupabaseClient.getProfile(session.user.id).then(function (profile) {
+                if (profile) Storage.setCurrentUser(profile);
+            });
+        }
         var loginForm = document.getElementById('loginForm');
         if (loginForm) {
             loginForm.addEventListener('submit', function (e) {
@@ -62,7 +64,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 handleLogin();
             });
         }
-
         var signupForm = document.getElementById('signupForm');
         if (signupForm) {
             signupForm.addEventListener('submit', function (e) {
@@ -71,10 +72,10 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     }).catch(function () {
-        // If Supabase fails, still show the page
         removeOverlay();
     });
 });
+
 
 async function handleLogin() {
     clearFieldErrors();
@@ -99,8 +100,9 @@ async function handleLogin() {
             return;
         }
 
-        const profile = await SupabaseClient.getProfile(session.user.id);
+        const profile = await SupabaseClient.getProfile(session.user.id);   
         if (profile) Storage.setCurrentUser(profile);
+       sessionStorage.setItem('just-signed-up', '1');
         setTimeout(function () { window.location.replace('dashboard.html'); }, 500);
     } catch (err) {
         console.error('Login error:', err);
