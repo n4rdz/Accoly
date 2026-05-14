@@ -18,12 +18,19 @@ function initCommunity() {
     var user = Storage.getCurrentUser();
     if (!user) return (window.location.href = 'login.html');
 
+    // Bind all UI immediately — never block these on Supabase
     initComposer(user);
     bindFilters();
     bindPostModal();
+
+    // Show loading state in feed
+    var feed = document.getElementById('communityFeed');
+    if (feed) feed.innerHTML = '<p style="color:var(--text-secondary);padding:1rem;">Loading posts...</p>';
+
+    // Load posts from Supabase
     loadAndRender();
 
-    // Auto-refresh every 30 seconds so new posts from other users appear
+    // Auto-refresh every 30 seconds
     setInterval(loadAndRender, 30000);
 }
 
