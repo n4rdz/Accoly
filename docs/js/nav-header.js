@@ -156,8 +156,10 @@
     }
 
     function onLogout() {
-        Storage.logout();
-        window.location.href = 'login.html';
+        SupabaseClient.signOut().finally(function () {
+            Storage.logout();
+            window.location.href = 'login.html';
+        });
     }
 
     function onDocClick(e) {

@@ -28,6 +28,52 @@ function removeOverlay() {
     if (el) el.remove();
 }
 
+// Build a minimal profile from the Supabase session when the profiles table
+// row is missing (e.g. RLS blocked the upsert, or email not yet confirmed).
+function profileFromSession(session) {
+    var u = session.user;
+    var meta = (u.user_metadata) || {};
+    var fullName = meta.full_name || meta.name || (u.email ? u.email.split('@')[0] : 'Student');
+    return {
+        id: u.id,
+        fullName: fullName,
+        email: u.email || '',
+        role: 'basic',
+        subscriptionStatus: 'free',
+        subscriptionDate: null,
+        createdAt: u.created_at || new Date().toISOString(),
+        password: ''
+    };
+}
+
+// Load profile from DB; fall back to session metadata if missing.
+function loadProfileAndReady(session) {
+    SupabaseClient.getProfile(session.user.id).then(function (profile) {
+        var resolved_profile = profile || profileFromSession(session);
+        Storage.setCurrentUser(resolved_profile);
+        // If the profile row was missing, try to create it now in the background
+        if (!profile) {
+            _sb.from('profiles').upsert({
+                id: session.user.id,
+                full_name: resolved_profile.fullName,
+                email: resolved_profile.email,
+                role: 'basic',
+                subscription_status: 'free',
+                created_at: resolved_profile.createdAt
+            }).then(function() {}).catch(function() {});
+        }
+        window.__authReady = true;
+        window.dispatchEvent(new Event('authReady'));
+        removeOverlay();
+    }).catch(function () {
+        var fallback = profileFromSession(session);
+        Storage.setCurrentUser(fallback);
+        window.__authReady = true;
+        window.dispatchEvent(new Event('authReady'));
+        removeOverlay();
+    });
+}
+
 // Global flag so other scripts (dashboard.js, etc.) know auth is ready
 window.__authReady = false;
 
@@ -60,16 +106,7 @@ window.__authReady = false;
                 window.location.replace('dashboard.html');
                 return;
             }
-            SupabaseClient.getProfile(session.user.id).then(function (profile) {
-                if (profile) Storage.setCurrentUser(profile);
-                window.__authReady = true;
-                window.dispatchEvent(new Event('authReady'));
-                removeOverlay();
-            }).catch(function () {
-                window.__authReady = true;
-                window.dispatchEvent(new Event('authReady'));
-                removeOverlay();
-            });
+            loadProfileAndReady(session);
         } else {
             // No session from storage — wait briefly for onAuthStateChange
             // in case Supabase is still verifying a token (e.g. OAuth callback)
@@ -94,16 +131,7 @@ window.__authReady = false;
                 window.location.replace('dashboard.html');
                 return;
             }
-            SupabaseClient.getProfile(session.user.id).then(function (profile) {
-                if (profile) Storage.setCurrentUser(profile);
-                window.__authReady = true;
-                window.dispatchEvent(new Event('authReady'));
-                removeOverlay();
-            }).catch(function () {
-                window.__authReady = true;
-                window.dispatchEvent(new Event('authReady'));
-                removeOverlay();
-            });
+            loadProfileAndReady(session);
         } else {
             if (isProtectedPage) {
                 window.location.replace('login.html');
@@ -171,9 +199,9 @@ async function handleLogin() {
             }
             return;
         }
-        // onAuthStateChange fires and redirects automatically
         const profile = await SupabaseClient.getProfile(session.user.id);
-        if (profile) Storage.setCurrentUser(profile);
+        Storage.setCurrentUser(profile || profileFromSession(session));
+        window.location.replace('dashboard.html');
     } catch (err) {
         console.error('Login error:', err);
         showError(errorDiv, 'Login failed. Please try again.');
@@ -239,9 +267,9 @@ async function handleSignup() {
             return;
         }
 
-        // onAuthStateChange fires and redirects automatically
         const profile = await SupabaseClient.getProfile(session.user.id);
-        if (profile) Storage.setCurrentUser(profile);
+        Storage.setCurrentUser(profile || profileFromSession(session));
+        window.location.replace('dashboard.html');
     } catch (err) {
         console.error('Signup error:', err);
         showError(errorDiv, 'Registration failed. Please try again.');
@@ -252,7 +280,7 @@ async function handleSignup() {
 async function logout() {
     await SupabaseClient.signOut();
     Storage.logout();
-    window.location.href = 'login.html';
+    window.location.replace('login.html');
 }
 
 function showError(errorDiv, message) {
