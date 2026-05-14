@@ -3,47 +3,77 @@
 // ============================================
 // Depends on: supabase-client.js loaded before this file
 
+// Inject loading overlay immediately — before DOMContentLoaded
+(function () {
+    var overlay = document.createElement('div');
+    overlay.id = 'auth-overlay';
+    overlay.style.cssText = [
+        'position:fixed', 'inset:0', 'z-index:99999',
+        'background:#f8fafc', 'display:flex',
+        'align-items:center', 'justify-content:center',
+        'font-family:sans-serif', 'font-size:1rem',
+        'color:#64748b'
+    ].join(';');
+    overlay.textContent = 'Loading...';
+    document.documentElement.appendChild(overlay);
+})();
+
+function removeOverlay() {
+    var el = document.getElementById('auth-overlay');
+    if (el) el.remove();
+}
+
 document.addEventListener('DOMContentLoaded', function () {
-    const currentPage = window.location.pathname.split('/').pop() || 'index.html';
-    const isAuthPage = currentPage.includes('login') || currentPage.includes('signup') || currentPage === 'index.html';
-    const isProtectedPage = !isAuthPage && currentPage !== '';
+    var currentPage = window.location.pathname.split('/').pop() || 'index.html';
+    var isAuthPage = currentPage.includes('login') ||
+                     currentPage.includes('signup') ||
+                     currentPage === 'index.html';
+    var isProtectedPage = !isAuthPage && currentPage !== '';
 
-    // Check Supabase session
     SupabaseClient.getSession().then(function (session) {
+
+        // Logged in but on login/signup → go to dashboard
         if (session && isAuthPage && currentPage !== 'index.html') {
-            window.location.href = 'dashboard.html';
-            return;
-        }
-        if (!session && isProtectedPage) {
-            window.location.href = 'login.html';
+            window.location.replace('dashboard.html');
             return;
         }
 
-        // If logged in, sync current user to Storage for legacy compatibility
+        // Not logged in but on protected page → go to login
+        if (!session && isProtectedPage) {
+            window.location.replace('login.html');
+            return;
+        }
+
+        // Auth check passed — remove overlay and show page
+        removeOverlay();
+
+        // Sync profile to localStorage for legacy compatibility
         if (session) {
             SupabaseClient.getProfile(session.user.id).then(function (profile) {
                 if (profile) Storage.setCurrentUser(profile);
             });
         }
+
+        // Bind forms AFTER auth check passes
+        var loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                handleLogin();
+            });
+        }
+
+        var signupForm = document.getElementById('signupForm');
+        if (signupForm) {
+            signupForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                handleSignup();
+            });
+        }
+    }).catch(function () {
+        // If Supabase fails, still show the page
+        removeOverlay();
     });
-
-    // Handle login form
-    const loginForm = document.getElementById('loginForm');
-    if (loginForm) {
-        loginForm.addEventListener('submit', function (e) {
-            e.preventDefault();
-            handleLogin();
-        });
-    }
-
-    // Handle signup form
-    const signupForm = document.getElementById('signupForm');
-    if (signupForm) {
-        signupForm.addEventListener('submit', function (e) {
-            e.preventDefault();
-            handleSignup();
-        });
-    }
 });
 
 async function handleLogin() {
