@@ -4,13 +4,13 @@
 const SUPABASE_URL = 'https://ftfgguwgtccqemwlutmv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_TsCJhb7DQcebE70q7dG2WA_S5aWD_ut';
 
+// Create client without using window.localStorage so auth state is not persisted to localStorage.
+// Sessions should be handled server-side (cookies) or kept in-memory in the app.
 const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
-        persistSession: true,
-        storageKey: 'accoly-auth',
-        storage: window.localStorage,
-        autoRefreshToken: true,
-        detectSessionInUrl: true
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
     }
 });
 
@@ -285,5 +285,106 @@ const SupabaseClient = {
 
     markAllNotificationsRead: async function (userId) {
         await _sb.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
+    },
+
+    // ── Leaderboard ──────────────────────────────────────────────────────────
+
+    getLeaderboard: async function (limit = 100) {
+        const { data, error } = await _sb.from('leaderboard').select('*').order('total_xp', { ascending: false }).limit(limit);
+        if (error || !data) return [];
+        return data.map(function (entry) {
+            return {
+                rank: entry.rank,
+                userId: entry.user_id,
+                userName: entry.user_name,
+                totalXP: entry.total_xp,
+                level: entry.level,
+                totalQuizzes: entry.total_quizzes,
+                accuracy: entry.accuracy_percentage
+            };
+        });
+    },
+
+    updateLeaderboard: async function (userId, userName, stats) {
+        const { error } = await _sb.from('leaderboard').upsert({
+            user_id: userId,
+            user_name: userName,
+            total_xp: stats.totalXP || 0,
+            level: stats.level || 1,
+            total_quizzes: stats.totalQuizzes || 0,
+            accuracy_percentage: stats.accuracyPercentage || 0
+        }).eq('user_id', userId);
+        return !error;
+    },
+
+    // ── Quizzes ──────────────────────────────────────────────────────────────
+
+    getQuizzes: async function (subject = null, difficulty = null) {
+        let query = _sb.from('quizzes').select('*');
+        if (subject) query = query.eq('subject', subject);
+        if (difficulty) query = query.eq('difficulty', difficulty);
+        const { data, error } = await query.order('created_at', { ascending: false });
+        if (error || !data) return [];
+        return data.map(function (q) {
+            return {
+                id: q.id,
+                subject: q.subject,
+                difficulty: q.difficulty,
+                title: q.title,
+                description: q.description,
+                questions: q.questions || [],
+                timeLimit: q.time_limit,
+                xpReward: q.xp_reward,
+                createdAt: q.created_at
+            };
+        });
+    },
+
+    getQuizById: async function (quizId) {
+        const { data, error } = await _sb.from('quizzes').select('*').eq('id', quizId).single();
+        if (error || !data) return null;
+        return {
+            id: data.id,
+            subject: data.subject,
+            difficulty: data.difficulty,
+            title: data.title,
+            description: data.description,
+            questions: data.questions || [],
+            timeLimit: data.time_limit,
+            xpReward: data.xp_reward,
+            createdAt: data.created_at
+        };
+    },
+
+    saveQuiz: async function (quiz) {
+        const row = {
+            subject: quiz.subject,
+            difficulty: quiz.difficulty,
+            title: quiz.title,
+            description: quiz.description || '',
+            questions: quiz.questions || [],
+            time_limit: quiz.timeLimit || 0,
+            xp_reward: quiz.xpReward || 10,
+            created_at: new Date().toISOString()
+        };
+        if (quiz.id) row.id = quiz.id;
+        const { data, error } = await _sb.from('quizzes').upsert(row).select().single();
+        if (error || !data) return null;
+        return {
+            id: data.id,
+            subject: data.subject,
+            difficulty: data.difficulty,
+            title: data.title,
+            description: data.description,
+            questions: data.questions,
+            timeLimit: data.time_limit,
+            xpReward: data.xp_reward,
+            createdAt: data.created_at
+        };
+    },
+
+    deleteQuiz: async function (quizId) {
+        const { error } = await _sb.from('quizzes').delete().eq('id', quizId);
+        return !error;
     }
 };
