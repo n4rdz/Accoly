@@ -99,11 +99,9 @@ async function handleLogin() {
             return;
         }
 
-        // Fetch profile and store locally for legacy compatibility
         const profile = await SupabaseClient.getProfile(session.user.id);
         if (profile) Storage.setCurrentUser(profile);
-
-        window.location.href = 'dashboard.html';
+        setTimeout(function () { window.location.replace('dashboard.html'); }, 500);
     } catch (err) {
         console.error('Login error:', err);
         showError(errorDiv, 'Login failed. Please try again.');
@@ -171,11 +169,9 @@ async function handleSignup() {
             return;
         }
 
-        // Profile is auto-created by Supabase trigger — fetch and store locally
         const profile = await SupabaseClient.getProfile(session.user.id);
         if (profile) Storage.setCurrentUser(profile);
-
-        window.location.href = 'dashboard.html';
+        setTimeout(function () { window.location.replace('dashboard.html'); }, 500);
     } catch (err) {
         console.error('Signup error:', err);
         showError(errorDiv, 'Registration failed. Please try again.');
