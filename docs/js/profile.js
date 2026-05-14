@@ -3,14 +3,19 @@
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    const user = Storage.getCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
+    if (window.__authReady) {
+        initProfile();
+    } else {
+        window.addEventListener('authReady', initProfile);
     }
+});
+
+function initProfile() {
+    const user = Storage.getCurrentUser();
+    if (!user) return; // auth.js already redirected
 
     loadProfile();
-});
+}
 
 // HTML escaping utility
 function esc(s) {
@@ -21,10 +26,7 @@ function esc(s) {
 
 function loadProfile() {
     const user = Storage.getCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
-    }
+    if (!user) return;
     
     const stats = Storage.getUserStats(user.id);
 

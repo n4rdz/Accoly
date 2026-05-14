@@ -1,8 +1,16 @@
 var MSG = { activeUserId: null, activeGroupId: null };
 
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.__authReady) {
+        initMessages();
+    } else {
+        window.addEventListener('authReady', initMessages);
+    }
+});
+
+function initMessages() {
     var user = Storage.getCurrentUser();
-    if (!user) return (window.location.href = 'login.html');
+    if (!user) return; // auth.js already redirected
 
     bindPremiumLocks();
     initUserPicker();
@@ -18,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function () {
             renderChat();
         }
     });
-});
+}
 
 function allUsersExceptMe() {
     var me = Storage.getCurrentUser();
@@ -285,4 +293,3 @@ function logout() {
     Storage.logout();
     window.location.href = 'login.html';
 }
-

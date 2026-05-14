@@ -11,8 +11,16 @@ var FLASH_DAILY_LIMIT = 15;
 var flashState = { subject: FLASH_SUBJECTS[0], index: 0, showBack: false };
 
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.__authReady) {
+        initFlashcards();
+    } else {
+        window.addEventListener('authReady', initFlashcards);
+    }
+});
+
+function initFlashcards() {
     var user = Storage.getCurrentUser();
-    if (!user) return (window.location.href = 'login.html');
+    if (!user) return; // auth.js already redirected
 
     seedFlashcards();
     var sel = document.getElementById('flashSubject');
@@ -42,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function () {
         renderFlashcard();
     });
     renderFlashcard();
-});
+}
 
 function isPremiumUser() {
     return window.AccolySubscription ? AccolySubscription.isPremiumUser() : false;

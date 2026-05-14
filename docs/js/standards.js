@@ -17,18 +17,23 @@ var stdState = {
 };
 
 document.addEventListener('DOMContentLoaded', function () {
-    var user = Storage.getCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
+    if (window.__authReady) {
+        initStandards();
+    } else {
+        window.addEventListener('authReady', initStandards);
     }
+});
+
+function initStandards() {
+    var user = Storage.getCurrentUser();
+    if (!user) return; // auth.js already redirected
 
     initFilters();
     initSubjectSelect();
     initUploadUi(user);
     bindEvents();
     renderStandards();
-});
+}
 
 function initFilters() {
     var container = document.getElementById('stdSubjectFilters');

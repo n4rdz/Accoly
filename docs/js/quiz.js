@@ -13,16 +13,17 @@ let timeLimit = 30 * 60; // Dynamic by difficulty
 let remainingTime = timeLimit;
 
 document.addEventListener('DOMContentLoaded', function() {
-    const user = Storage.getCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
+    if (window.__authReady) {
+        initQuizCenter();
+    } else {
+        window.addEventListener('authReady', initQuizCenter);
     }
-
-    initQuizCenter();
 });
 
 function initQuizCenter() {
+    const user = Storage.getCurrentUser();
+    if (!user) return; // auth.js already redirected
+
     loadQuizModules();
 }
 

@@ -5,14 +5,19 @@
 let currentFilter = 'all_time';
 
 document.addEventListener('DOMContentLoaded', function() {
-    const user = Storage.getCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
+    if (window.__authReady) {
+        initLeaderboard();
+    } else {
+        window.addEventListener('authReady', initLeaderboard);
     }
+});
+
+function initLeaderboard() {
+    const user = Storage.getCurrentUser();
+    if (!user) return; // auth.js already redirected
 
     loadLeaderboard();
-});
+}
 
 function loadLeaderboard() {
     const allAttempts = filterAttemptsByPeriod(Storage.getQuizAttempts(), currentFilter);

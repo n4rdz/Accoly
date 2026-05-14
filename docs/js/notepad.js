@@ -21,11 +21,16 @@ var NP = {
 };
 
 document.addEventListener('DOMContentLoaded', function () {
-    var user = Storage.getCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
+    if (window.__authReady) {
+        initNotepad();
+    } else {
+        window.addEventListener('authReady', initNotepad);
     }
+});
+
+function initNotepad() {
+    var user = Storage.getCurrentUser();
+    if (!user) return; // auth.js already redirected
 
     NP.canvas = document.getElementById('drawingCanvas');
     NP.ctx = NP.canvas.getContext('2d');
@@ -40,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('resize', scheduleResizeCanvas);
     scheduleResizeCanvas();
     updateUndoRedoButtons();
-});
+}
 
 function scheduleResizeCanvas() {
     requestAnimationFrame(resizeCanvasDisplay);

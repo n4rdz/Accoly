@@ -1,9 +1,14 @@
 document.addEventListener('DOMContentLoaded', function () {
-    var user = window.AccolySubscription ? AccolySubscription.getCurrentUserFresh() : Storage.getCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
+    if (window.__authReady) {
+        initSettings();
+    } else {
+        window.addEventListener('authReady', initSettings);
     }
+});
+
+function initSettings() {
+    var user = window.AccolySubscription ? AccolySubscription.getCurrentUserFresh() : Storage.getCurrentUser();
+    if (!user) return; // auth.js already redirected
 
     var emailEl = document.getElementById('settingEmail');
     if (emailEl) emailEl.value = user.email;
@@ -17,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     initSubscriptionPanel();
-});
+}
 
 function initSubscriptionPanel() {
     var user = AccolySubscription.getCurrentUserFresh();
@@ -106,4 +111,3 @@ function logout() {
     Storage.logout();
     window.location.href = 'login.html';
 }
-

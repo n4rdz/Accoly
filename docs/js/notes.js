@@ -31,11 +31,17 @@ var PDF = {
     dirty: false
 };
 
-document.addEventListener('DOMContentLoaded', initNotesV2);
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.__authReady) {
+        initNotesV2();
+    } else {
+        window.addEventListener('authReady', initNotesV2);
+    }
+});
 
 function initNotesV2() {
     var user = Storage.getCurrentUser();
-    if (!user) return (window.location.href = 'login.html');
+    if (!user) return; // auth.js already redirected
     if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
