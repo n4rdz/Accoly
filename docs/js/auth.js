@@ -31,7 +31,12 @@ function removeOverlay() {
 // Global flag so other scripts (dashboard.js, etc.) know auth is ready
 window.__authReady = false;
 
-document.addEventListener('DOMContentLoaded', function () {
+// ── Core auth check — runs immediately, NOT inside DOMContentLoaded ──────────
+// Supabase fires onAuthStateChange with (null session) first on some page loads
+// before the real session token is read from storage. Putting this inside
+// DOMContentLoaded made the race worse. Running it immediately gives Supabase
+// the maximum time to resolve the session before the page JS tries to use it.
+(function () {
     var currentPage = window.location.pathname.split('/').pop() || 'index.html';
     var isAuthPage = currentPage.includes('login') ||
                      currentPage.includes('signup') ||
@@ -40,8 +45,48 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var resolved = false;
 
+    // Use getSession() first — it reads from localStorage synchronously and is
+    // reliable. onAuthStateChange alone can fire INITIAL_SESSION with null on
+    // the first tick, causing a false redirect before the token is verified.
+    _sb.auth.getSession().then(function (result) {
+        if (resolved) return;
+
+        var session = result && result.data && result.data.session;
+
+        if (session) {
+            // Valid session — load profile then signal ready
+            resolved = true;
+            if (isAuthPage && currentPage !== 'index.html') {
+                window.location.replace('dashboard.html');
+                return;
+            }
+            SupabaseClient.getProfile(session.user.id).then(function (profile) {
+                if (profile) Storage.setCurrentUser(profile);
+                window.__authReady = true;
+                window.dispatchEvent(new Event('authReady'));
+                removeOverlay();
+            }).catch(function () {
+                window.__authReady = true;
+                window.dispatchEvent(new Event('authReady'));
+                removeOverlay();
+            });
+        } else {
+            // No session from storage — wait briefly for onAuthStateChange
+            // in case Supabase is still verifying a token (e.g. OAuth callback)
+            // The timeout below acts as the final fallback.
+        }
+    }).catch(function () {
+        // getSession failed — fall through to onAuthStateChange / timeout
+    });
+
+    // onAuthStateChange handles token refreshes and post-login events
     _sb.auth.onAuthStateChange(function (event, session) {
         if (resolved) return;
+
+        // Ignore the very first INITIAL_SESSION null — getSession() above
+        // already handled the no-session case more reliably.
+        if (!session && event === 'INITIAL_SESSION') return;
+
         resolved = true;
 
         if (session) {
@@ -68,24 +113,9 @@ document.addEventListener('DOMContentLoaded', function () {
             window.dispatchEvent(new Event('authReady'));
             removeOverlay();
         }
-
-        var loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                handleLogin();
-            });
-        }
-        var signupForm = document.getElementById('signupForm');
-        if (signupForm) {
-            signupForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                handleSignup();
-            });
-        }
     });
 
-    // Safety fallback: if onAuthStateChange never fires within 3s
+    // Safety fallback: if neither getSession nor onAuthStateChange resolve in 4s
     setTimeout(function () {
         if (!resolved) {
             resolved = true;
@@ -97,7 +127,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 removeOverlay();
             }
         }
-    }, 3000);
+    }, 4000);
+})();
+
+// ── Bind login/signup forms after DOM is ready ───────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    var loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            handleLogin();
+        });
+    }
+    var signupForm = document.getElementById('signupForm');
+    if (signupForm) {
+        signupForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            handleSignup();
+        });
+    }
 });
 
 
