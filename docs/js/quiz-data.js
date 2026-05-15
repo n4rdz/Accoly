@@ -5,48 +5,56 @@
 const QUIZ_MODULES = [
     {
         id: 1,
-        name: 'FAR',
-        subject: 'FAR',
+        name: 'Financial Accounting',
+        subject: 'Financial Accounting',
         difficulty: 'Easy',
         color: 'from-blue-500 to-blue-600',
         icon: '📊'
     },
     {
         id: 2,
-        name: 'AFAR',
-        subject: 'AFAR',
+        name: 'Cost Accounting',
+        subject: 'Cost Accounting',
         difficulty: 'Medium',
         color: 'from-purple-500 to-purple-600',
-        icon: '📒'
+        icon: '💰'
     },
     {
         id: 3,
-        name: 'AUD',
-        subject: 'AUD',
+        name: 'Auditing',
+        subject: 'Auditing',
         difficulty: 'Hard',
         color: 'from-green-500 to-green-600',
         icon: '🔍'
     },
     {
         id: 4,
-        name: 'TAX',
-        subject: 'TAX',
+        name: 'Taxation',
+        subject: 'Taxation',
         difficulty: 'Medium',
         color: 'from-orange-500 to-orange-600',
         icon: '📋'
     },
     {
         id: 5,
-        name: 'RFBT',
-        subject: 'RFBT',
+        name: 'Business Law',
+        subject: 'Business Law',
         difficulty: 'Easy',
         color: 'from-red-500 to-red-600',
         icon: '⚖️'
     },
     {
         id: 6,
-        name: 'MS',
-        subject: 'MS',
+        name: 'Economics',
+        subject: 'Economics',
+        difficulty: 'Medium',
+        color: 'from-cyan-500 to-cyan-600',
+        icon: '📈'
+    },
+    {
+        id: 7,
+        name: 'Management Advisory Services',
+        subject: 'MAS',
         difficulty: 'Elite',
         color: 'from-indigo-500 to-indigo-600',
         icon: '💼'
@@ -54,7 +62,7 @@ const QUIZ_MODULES = [
 ];
 
 const QUIZ_QUESTIONS = {
-    1: [ // FAR
+    1: [ // Financial Accounting
         {
             id: 1,
             question: 'What is the primary purpose of the Balance Sheet?',
@@ -176,7 +184,7 @@ const QUIZ_QUESTIONS = {
             explanation: 'Accounts Receivable represents money owed by customers, which is an asset.'
         }
     ],
-    2: [ // AFAR
+    2: [ // Cost Accounting
         {
             id: 1,
             question: 'What is the primary purpose of cost accounting?',
@@ -298,7 +306,7 @@ const QUIZ_QUESTIONS = {
             explanation: 'Abnormal spoilage is spoilage beyond expected levels and is treated as a loss.'
         }
     ],
-    3: [ // AUD
+    3: [ // Auditing - Hard questions
         {
             id: 1,
             question: 'What is the primary objective of an audit?',
@@ -420,7 +428,7 @@ const QUIZ_QUESTIONS = {
             explanation: 'Working papers document procedures, support conclusions, and provide evidence.'
         }
     ],
-    4: [ // TAX
+    4: [ // Taxation
         {
             id: 1,
             question: 'What is the basic purpose of taxation?',
@@ -542,7 +550,7 @@ const QUIZ_QUESTIONS = {
             explanation: 'A loss carryforward allows unused losses to be applied to reduce taxes in future years.'
         }
     ],
-    5: [ // RFBT
+    5: [ // Business Law
         {
             id: 1,
             question: 'What is a contract?',
@@ -664,7 +672,7 @@ const QUIZ_QUESTIONS = {
             explanation: 'A bailment is the temporary possession of another\'s property for a specific purpose.'
         }
     ],
-    6: [ // MS (Management Services)
+    6: [ // Economics
         {
             id: 1,
             question: 'Economics is the study of:',
@@ -786,7 +794,7 @@ const QUIZ_QUESTIONS = {
             explanation: 'Recession involves declining GDP, rising unemployment, and reduced economic activity.'
         }
     ],
-    7: [ // legacy MS bank
+    7: [ // Management Advisory Services
         {
             id: 1,
             question: 'MAS primarily focuses on:',
@@ -909,6 +917,3 @@ const QUIZ_QUESTIONS = {
         }
     ]
 };
-
-// MS module uses the former MAS question bank
-QUIZ_QUESTIONS[6] = QUIZ_QUESTIONS[7];

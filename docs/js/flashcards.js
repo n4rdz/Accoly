@@ -1,14 +1,20 @@
-var FLASH_SUBJECTS = ['FAR', 'AFAR', 'MS', 'AUD', 'RFBT', 'TAX'];
+var FLASH_SUBJECTS = [
+    'Financial Accounting',
+    'Cost Accounting',
+    'Auditing',
+    'Taxation',
+    'Business Law',
+    'Economics',
+    'Management Advisory Services'
+];
 var FLASH_DAILY_LIMIT = 15;
 var flashState = { subject: FLASH_SUBJECTS[0], index: 0, showBack: false, allCards: [] };
-
-var _flashcardsInitialized = false;
 
 document.addEventListener('DOMContentLoaded', function () {
     if (window.__authReady) {
         initFlashcards();
     } else {
-        window.addEventListener('authReady', initFlashcards, { once: true });
+        window.addEventListener('authReady', initFlashcards);
     }
 });
 
@@ -39,16 +45,14 @@ function seedFlashcardsIfNeeded(user) {
 }
 
 function initFlashcards() {
-    if (_flashcardsInitialized) return;
     var user = Storage.getCurrentUser();
-    if (!user) return;
-    _flashcardsInitialized = true;
+    if (!user) return; // auth.js already redirected
 
     var sel = document.getElementById('flashSubject');
     FLASH_SUBJECTS.forEach(function (s) {
         var o = document.createElement('option');
         o.value = s;
-        o.textContent = window.AccolyStats ? AccolyStats.getSubjectLabel(s) : s;
+        o.textContent = s;
         sel.appendChild(o);
     });
     sel.addEventListener('change', function (e) {
@@ -79,7 +83,7 @@ function initFlashcards() {
             return reloadFlashcardsFromServer(user);
         })
         .then(function () {
-            loadDailyProgress(user.id, function () { renderFlashcard(); });
+            renderFlashcard();
         })
         .catch(function (err) {
             console.error('Flashcards init error:', err);
@@ -103,47 +107,19 @@ function todayKey() {
     return new Date().toISOString().slice(0, 10);
 }
 
-var _flashDailyCache = { reviewed: 0, correct: 0, incorrect: 0 };
-
-function loadDailyProgress(userId, cb) {
-    if (!window.SupabaseClient || !SupabaseClient.getFlashDailyProgress) {
-        _flashDailyCache = { reviewed: 0, correct: 0, incorrect: 0 };
-        if (cb) cb(_flashDailyCache);
-        return Promise.resolve(_flashDailyCache);
-    }
-    return SupabaseClient.getFlashDailyProgress(userId, flashState.subject, todayKey())
-        .then(function (p) {
-            _flashDailyCache = p || { reviewed: 0, correct: 0, incorrect: 0 };
-            if (cb) cb(_flashDailyCache);
-            return _flashDailyCache;
-        })
-        .catch(function () {
-            _flashDailyCache = { reviewed: 0, correct: 0, incorrect: 0 };
-            if (cb) cb(_flashDailyCache);
-            return _flashDailyCache;
-        });
-}
-
 function dailyProgress(userId) {
-    return _flashDailyCache;
+    return Storage.getFlashDailyProgress(userId, flashState.subject, todayKey());
 }
 
 function renderFlashcard() {
     var user = Storage.getCurrentUser();
-    if (!user) return;
     var cards = subjectCards();
     if (flashState.index >= cards.length) flashState.index = 0;
 
     var progress = dailyProgress(user.id);
-    var remaining = Math.max(0, FLASH_DAILY_LIMIT - (progress.reviewed || 0));
-    var dailyEl = document.getElementById('flashDailyInfo');
-    var statsEl = document.getElementById('flashStatsInfo');
-    if (dailyEl) {
-        dailyEl.textContent = 'Daily limit: ' + (progress.reviewed || 0) + '/' + FLASH_DAILY_LIMIT + ' reviewed • Remaining: ' + remaining;
-    }
-    if (statsEl) {
-        statsEl.textContent = 'Correct: ' + (progress.correct || 0) + ' • Incorrect: ' + (progress.incorrect || 0);
-    }
+    var remaining = Math.max(0, FLASH_DAILY_LIMIT - progress.reviewed);
+    document.getElementById('flashDailyInfo').textContent = 'Daily limit: ' + progress.reviewed + '/' + FLASH_DAILY_LIMIT + ' reviewed • Remaining: ' + remaining;
+    document.getElementById('flashStatsInfo').textContent = 'Correct: ' + progress.correct + ' • Incorrect: ' + progress.incorrect;
 
     var empty = document.getElementById('flashEmpty');
     var ui = document.getElementById('flashCardUI');
@@ -200,15 +176,12 @@ function markCard(correct) {
     }
 
     var card = cards[flashState.index];
+    Storage.recordFlashReview(user.id, flashState.subject, todayKey(), correct);
 
     function afterPersist() {
-        loadDailyProgress(user.id, function () {
-            flashState.showBack = false;
-            moveCard(1);
-        });
+        flashState.showBack = false;
+        moveCard(1);
     }
-
-    var reviewPromise = SupabaseClient.recordFlashReview(user.id, flashState.subject, todayKey(), correct);
 
     if (!correct) {
         card.confusionCount = (card.confusionCount || 0) + 1;
@@ -226,13 +199,11 @@ function markCard(correct) {
             .catch(function (e) {
                 console.error(e);
             })
-            .finally(function () {
-                reviewPromise.finally(afterPersist);
-            });
+            .finally(afterPersist);
         return;
     }
 
-    reviewPromise.finally(afterPersist);
+    afterPersist();
 }
 
 function openModal() {
@@ -308,8 +279,8 @@ function saveCard() {
 
 function resetDaily() {
     var user = Storage.getCurrentUser();
-    SupabaseClient.resetFlashDaily(user.id, flashState.subject, todayKey())
-        .then(function () { loadDailyProgress(user.id, function () { renderFlashcard(); }); });
+    Storage.resetFlashDaily(user.id, flashState.subject, todayKey());
+    renderFlashcard();
 }
 
 function esc(s) {
@@ -319,8 +290,6 @@ function esc(s) {
 }
 
 function logout() {
-    SupabaseClient.signOut().finally(function () {
-        Storage.logout();
-        window.location.replace('login.html');
-    });
+    Storage.logout();
+    window.location.href = 'login.html';
 }

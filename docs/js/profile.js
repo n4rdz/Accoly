@@ -52,17 +52,19 @@ function loadProfile() {
     Promise.all([
         SupabaseClient.getUserStats(user.id),
         SupabaseClient.getQuizAttempts(user.id),
+        SupabaseClient.getPosts(),
         SupabaseClient.getLibraryFiles(user.id),
         SupabaseClient.getFlashcards(user.id)
     ])
         .then(function (results) {
             const dbStats = results[0];
             const attempts = results[1];
-            const libraryFiles = results[2] || [];
-            const flashcards = results[3] || [];
+            const posts = results[2];
+            const libraryFiles = results[3] || [];
+            const flashcards = results[4] || [];
             const derived = AccolyStats.buildUserStatsFromAttempts(attempts);
             const stats = AccolyStats.mergeStats(dbStats, derived);
-            renderProfileHeader(user, stats, libraryFiles, flashcards);
+            renderProfileHeader(user, stats, posts, libraryFiles, flashcards);
             renderLevelTiers(stats);
             renderAchievements(stats);
             renderSubjectRatingsFromAttempts(attempts);
@@ -107,7 +109,7 @@ function renderLevelTiers(stats) {
     }).join('');
 }
 
-function renderProfileHeader(user, stats, libraryFiles, flashcards) {
+function renderProfileHeader(user, stats, posts, libraryFiles, flashcards) {
     const initials = (user.fullName || 'U')
         .split(' ')
         .map(function (n) { return n[0]; })
@@ -175,6 +177,9 @@ function renderProfileHeader(user, stats, libraryFiles, flashcards) {
         profileXPProgress.textContent = xpInCurrentLevel + ' / ' + xpNeededForLevel + ' XP to next level';
     }
 
+    var profileAccuracy = document.getElementById('profileAccuracy');
+    if (profileAccuracy) profileAccuracy.textContent = (stats.accuracyPercentage != null ? stats.accuracyPercentage : 0) + '%';
+
     var profileQuizzes = document.getElementById('profileQuizzes');
     if (profileQuizzes) profileQuizzes.textContent = String(stats.totalQuizzes != null ? stats.totalQuizzes : 0);
 
@@ -186,6 +191,8 @@ function renderProfileHeader(user, stats, libraryFiles, flashcards) {
     if (libraryEl) libraryEl.textContent = String((libraryFiles || []).length);
     if (flashEl) flashEl.textContent = String((flashcards || []).length);
 
+    var likesEl = document.getElementById('profileLikesReceived');
+    if (likesEl) likesEl.textContent = String(calculateLikesReceived(user.id, posts));
 }
 
 function renderAchievements(stats) {
@@ -194,8 +201,8 @@ function renderAchievements(stats) {
 
     var tq = stats.totalQuizzes || 0;
     var streak = stats.currentStreak || 0;
+    var acc = stats.accuracyPercentage || 0;
     var level = stats.level || 1;
-    var xp = stats.totalXP || 0;
 
     var defs = [
         {
@@ -211,10 +218,10 @@ function renderAchievements(stats) {
             unlocked: streak >= 7
         },
         {
-            icon: '💎',
-            title: 'XP Collector',
-            desc: 'Earn 3,500+ total XP',
-            unlocked: xp >= 3500
+            icon: '🎯',
+            title: 'Accuracy Ace',
+            desc: '90%+ average accuracy',
+            unlocked: acc >= 90 && tq >= 3
         },
         {
             icon: '👑',
@@ -243,12 +250,10 @@ function renderSubjectRatingsFromAttempts(attempts) {
     if (!el) return;
     var map = {};
     (attempts || []).forEach(function (a) {
-        var code = window.AccolyStats
-            ? AccolyStats.normalizeSubjectCode(a.subject)
-            : a.subject || 'FAR';
-        if (!map[code]) map[code] = { sum: 0, n: 0 };
-        map[code].sum += typeof a.score === 'number' ? a.score : 0;
-        map[code].n += 1;
+        var s = a.subject || 'General';
+        if (!map[s]) map[s] = { sum: 0, n: 0 };
+        map[s].sum += typeof a.score === 'number' ? a.score : 0;
+        map[s].n += 1;
     });
     var keys = Object.keys(map);
     if (!keys.length) {
@@ -259,18 +264,32 @@ function renderSubjectRatingsFromAttempts(attempts) {
     el.innerHTML =
         '<div class="profile-ratings-list">' +
         keys
-            .map(function (code) {
-                var avg = Math.round(map[code].sum / map[code].n);
-                var label = window.AccolyStats ? AccolyStats.getSubjectLabel(code) : code;
+            .map(function (s) {
+                var avg = Math.round(map[s].sum / map[s].n);
                 return (
                     '<div class="profile-ratings-row">' +
-                    '<span>' + esc(label) + '</span>' +
+                    '<span>' + esc(s) + '</span>' +
                     '<strong>' + avg + '% avg</strong>' +
                     '</div>'
                 );
             })
             .join('') +
         '</div>';
+}
+
+function calculateLikesReceived(userId, posts) {
+    var total = 0;
+    (posts || []).forEach(function (p) {
+        if (p.userId !== userId) return;
+        if (p.reactions && Array.isArray(p.reactions.like)) total += p.reactions.like.length;
+        else if (p.reactions && typeof p.reactions.like === 'number') total += p.reactions.like;
+        if (p.reactions && p.reactions.emojis) {
+            Object.keys(p.reactions.emojis).forEach(function (k) {
+                total += p.reactions.emojis[k] || 0;
+            });
+        }
+    });
+    return total;
 }
 
 function loadRecentQuizzesFromAttempts(attempts) {
@@ -294,13 +313,7 @@ function loadRecentQuizzesFromAttempts(attempts) {
             return (
                 '<div class="quiz-item">' +
                 '<div class="quiz-item-info">' +
-                '<h4>' +
-                esc(
-                    window.AccolyStats
-                        ? AccolyStats.getSubjectLabel(AccolyStats.normalizeSubjectCode(attempt.subject))
-                        : attempt.subject || 'Unknown'
-                ) +
-                '</h4>' +
+                '<h4>' + esc(attempt.subject || 'Unknown') + '</h4>' +
                 '<p class="quiz-item-date">' + esc(dateStr) + ' • ' + esc(diff) + '</p>' +
                 '</div>' +
                 '<div class="quiz-item-score">' +

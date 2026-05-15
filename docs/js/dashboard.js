@@ -90,13 +90,11 @@ function renderDashboardMain(user, stats, attempts, flashcardCount) {
 
     var padEl = document.getElementById('dashNotepadCount');
     if (padEl) {
-        SupabaseClient.getNotepadEntries(user.id)
-            .then(function (entries) {
-                padEl.textContent = String((entries || []).length);
-            })
-            .catch(function () {
-                padEl.textContent = '0';
-            });
+        try {
+            padEl.textContent = String(Storage.getNotepadEntries(user.id).length);
+        } catch (e) {
+            padEl.textContent = '0';
+        }
     }
 }
 
@@ -105,9 +103,7 @@ function renderSubjectBreakdown(attempts) {
     if (!host) return;
     var map = {};
     (attempts || []).forEach(function (a) {
-        var s = window.AccolyStats
-            ? AccolyStats.getSubjectLabel(AccolyStats.normalizeSubjectCode(a.subject))
-            : a.subject || 'FAR';
+        var s = a.subject || 'General';
         if (!map[s]) map[s] = { pts: 0, n: 0, acc: 0 };
         map[s].pts += a.xpEarned || 0;
         map[s].acc += AccolyStats.computeAttemptAccuracy(a);
@@ -198,8 +194,6 @@ function loadRecentActivityFromAttempts(attempts) {
 }
 
 function logout() {
-    SupabaseClient.signOut().finally(function () {
-        Storage.logout();
-        window.location.replace('login.html');
-    });
+    Storage.logout();
+    window.location.href = 'login.html';
 }

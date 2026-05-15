@@ -63,7 +63,14 @@
                     <div class="notepad-toolbar" aria-label="Drawing tools">
                         <div class="tool-group">
                             <span style="font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.25rem;">Subject</span>
-                            <select id="notepadSubjectSelect" class="sort-select" aria-label="Notepad subject" style="min-width: 14rem;"></select>
+                            <select id="notepadSubjectSelect" class="sort-select" aria-label="Notepad subject" style="min-width: 10rem;">
+                                <option value="General">General</option>
+                                <option value="Financial Accounting">Financial Accounting</option>
+                                <option value="Cost Accounting">Cost Accounting</option>
+                                <option value="Auditing">Auditing</option>
+                                <option value="Taxation">Taxation</option>
+                                <option value="Business Law">Business Law</option>
+                            </select>
                         </div>
                         <div class="tool-group">
                             <span style="font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.25rem;">Tools</span>
@@ -130,7 +137,6 @@
     <script src="js/supabase-client.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/storage.js"></script>
-    <script src="js/stats-utils.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/nav-header.js"></script>
     <script src="js/ui.js"></script>
