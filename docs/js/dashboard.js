@@ -19,15 +19,17 @@ function initDashboard() {
     Promise.all([
         SupabaseClient.getUserStats(user.id),
         SupabaseClient.getQuizAttempts(user.id),
-        SupabaseClient.getFlashcards(user.id)
+        SupabaseClient.getFlashcards(user.id),
+        SupabaseClient.getNotepadEntries(user.id)
     ])
         .then(function (results) {
             var dbStats = results[0];
             var attempts = results[1] || [];
             var flashcards = results[2] || [];
+            var notepadEntries = results[3] || [];
             var derived = AccolyStats.buildUserStatsFromAttempts(attempts);
             var stats = AccolyStats.mergeStats(dbStats, derived);
-            renderDashboardMain(user, stats, attempts, flashcards.length);
+            renderDashboardMain(user, stats, attempts, flashcards.length, notepadEntries.length);
             loadRecentActivityFromAttempts(attempts);
             renderSubjectBreakdown(attempts);
         })
@@ -36,7 +38,7 @@ function initDashboard() {
         });
 }
 
-function renderDashboardMain(user, stats, attempts, flashcardCount) {
+function renderDashboardMain(user, stats, attempts, flashcardCount, notepadCount) {
     var initials = user.fullName
         .split(' ')
         .map(function (n) {
@@ -89,13 +91,7 @@ function renderDashboardMain(user, stats, attempts, flashcardCount) {
     if (flashEl) flashEl.textContent = String(flashcardCount || 0);
 
     var padEl = document.getElementById('dashNotepadCount');
-    if (padEl) {
-        try {
-            padEl.textContent = String(Storage.getNotepadEntries(user.id).length);
-        } catch (e) {
-            padEl.textContent = '0';
-        }
-    }
+    if (padEl) padEl.textContent = String(notepadCount || 0);
 }
 
 function renderSubjectBreakdown(attempts) {
@@ -103,10 +99,9 @@ function renderSubjectBreakdown(attempts) {
     if (!host) return;
     var map = {};
     (attempts || []).forEach(function (a) {
-        var s = a.subject || 'General';
-        if (!map[s]) map[s] = { pts: 0, n: 0, acc: 0 };
+        var s = AccolyStats.normalizeSubjectCode(a.subject) || 'FAR';
+        if (!map[s]) map[s] = { pts: 0, n: 0 };
         map[s].pts += a.xpEarned || 0;
-        map[s].acc += AccolyStats.computeAttemptAccuracy(a);
         map[s].n += 1;
     });
     var keys = Object.keys(map);
@@ -121,11 +116,11 @@ function renderSubjectBreakdown(attempts) {
         })
         .map(function (s) {
             var row = map[s];
-            var avg = row.n ? Math.round(row.acc / row.n) : 0;
+            var label = AccolyStats.getSubjectLabel(s);
             return (
                 '<div class="activity-item" style="margin-bottom:0.5rem;">' +
                 '<div class="activity-text"><h4>' +
-                s +
+                label +
                 '</h4><p class="activity-time">' +
                 row.n +
                 ' quiz' +
@@ -135,9 +130,6 @@ function renderSubjectBreakdown(attempts) {
                 '<div style="font-weight:700;color:var(--primary);">' +
                 row.pts +
                 ' pts</div>' +
-                '<div style="font-size:0.85rem;color:var(--text-secondary);">' +
-                avg +
-                '% accuracy</div>' +
                 '</div>' +
                 '</div>'
             );
@@ -165,7 +157,9 @@ function loadRecentActivityFromAttempts(attempts) {
     recentList.innerHTML = recent
         .map(function (attempt) {
             var score = attempt.score || 0;
-            var subject = attempt.subject || 'Unknown';
+            var subject = window.AccolyStats
+                ? AccolyStats.getSubjectShortLabel(attempt.subject)
+                : (attempt.subject || 'Unknown');
             var pts = attempt.xpEarned || 0;
             var date = attempt.timestamp
                 ? new Date(attempt.timestamp).toLocaleDateString()

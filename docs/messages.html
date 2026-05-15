@@ -14,6 +14,7 @@
             <div class="sidebar-logo"><h2>Accoly</h2><p style="font-size: 0.75rem; margin: 0; color: var(--text-secondary);">Accoly Technologies</p></div>
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="notes.html" class="nav-item"><span class="nav-icon">📄</span><span>PDF</span></a>
                 <a href="community.html" class="nav-item"><span class="nav-icon">🧑‍🤝‍🧑</span><span>Community</span></a>
                 <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz Center</span></a>
                 <a href="notepad.html" class="nav-item"><span class="nav-icon">✏️</span><span>Notepad</span></a>
@@ -73,9 +74,10 @@
                                 <h3 style="margin:0;" id="chatTitle">Select a conversation</h3>
                                 <p style="margin:0;" id="chatSubtitle"></p>
                             </div>
-                            <button type="button" class="btn btn-outline" id="btnPremiumGroup" title="Premium">
-                                🔒 Create group
-                            </button>
+                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                                <button type="button" class="btn btn-outline" id="btnPremiumGroup" title="Premium">🔒 Create group</button>
+                                <button type="button" class="btn btn-outline" id="btnAddGroupMember" hidden data-premium="true">Add member</button>
+                            </div>
                         </div>
 
                         <div class="card" id="groupsPremiumPanel" style="margin-bottom:0.75rem;">
@@ -100,12 +102,55 @@
     <script src="js/supabase-client.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/stats-utils.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/nav-header.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/subscription.js"></script>
     <script src="js/offline.js"></script>
     <script src="js/messages.js"></script>
+
+    <div id="groupModal" class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-panel" style="max-width:420px;">
+            <div class="modal-header">
+                <h2>Create study group</h2>
+                <button type="button" class="modal-close" id="groupModalClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="groupNameInput">Group name</label>
+                    <input type="text" id="groupNameInput" class="form-input" placeholder="e.g. FAR review squad" />
+                </div>
+                <div class="form-group">
+                    <label for="groupSubjectSelect">Subject</label>
+                    <select id="groupSubjectSelect" class="form-select"></select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="groupModalCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="groupModalSave">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addMemberModal" class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-panel" style="max-width:420px;">
+            <div class="modal-header">
+                <h2>Add member</h2>
+                <button type="button" class="modal-close" id="addMemberModalClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="addMemberPicker">Student</label>
+                    <select id="addMemberPicker" class="form-select"></select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="addMemberCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="addMemberSave">Add</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 

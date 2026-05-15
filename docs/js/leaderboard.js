@@ -1,5 +1,6 @@
 // Leaderboard — all-time rankings from Supabase quiz_attempts
 var currentSubjectFilter = 'All Subjects';
+var currentDifficultyFilter = 'All Difficulties';
 
 document.addEventListener('DOMContentLoaded', function () {
     if (window.__authReady) {
@@ -13,7 +14,14 @@ function initLeaderboard() {
     var user = Storage.getCurrentUser();
     if (!user) return;
     initSubjectFilter();
+    initDifficultyFilter();
     loadLeaderboard();
+}
+
+function subjectFilterLabel(code) {
+    if (!window.AccolyStats) return code;
+    if (code === 'All Subjects') return 'All Subjects';
+    return AccolyStats.getSubjectLabel(code);
 }
 
 function initSubjectFilter() {
@@ -21,11 +29,14 @@ function initSubjectFilter() {
     if (!container || !window.AccolyStats) return;
     container.innerHTML = AccolyStats.QUIZ_SUBJECTS.map(function (subj) {
         var active = subj === currentSubjectFilter ? ' active' : '';
+        var label = subjectFilterLabel(subj);
         return (
             '<button type="button" class="filter-btn' + active + '" data-subject="' +
             subj.replace(/"/g, '&quot;') +
+            '" title="' +
+            label.replace(/"/g, '&quot;') +
             '">' +
-            subj +
+            (subj === 'All Subjects' ? subj : AccolyStats.getSubjectShortLabel(subj)) +
             '</button>'
         );
     }).join('');
@@ -40,13 +51,42 @@ function initSubjectFilter() {
     });
 }
 
+function initDifficultyFilter() {
+    var container = document.getElementById('difficultyFilterButtons');
+    if (!container || !window.AccolyStats) return;
+    container.innerHTML = AccolyStats.QUIZ_DIFFICULTIES.map(function (diff) {
+        var active = diff === currentDifficultyFilter ? ' active' : '';
+        return (
+            '<button type="button" class="filter-btn' + active + '" data-difficulty="' +
+            diff.replace(/"/g, '&quot;') +
+            '">' +
+            diff +
+            '</button>'
+        );
+    }).join('');
+    container.querySelectorAll('.filter-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            currentDifficultyFilter = btn.getAttribute('data-difficulty') || 'All Difficulties';
+            container.querySelectorAll('.filter-btn').forEach(function (b) {
+                b.classList.toggle('active', b === btn);
+            });
+            loadLeaderboard();
+        });
+    });
+}
+
 function loadLeaderboard() {
     var filterLabel = document.getElementById('leaderboardFilterLabel');
     if (filterLabel) {
-        filterLabel.textContent =
+        var subjPart =
             currentSubjectFilter === 'All Subjects'
-                ? 'All-time · all subjects'
-                : 'All-time · ' + currentSubjectFilter;
+                ? 'all subjects'
+                : subjectFilterLabel(currentSubjectFilter);
+        var diffPart =
+            currentDifficultyFilter === 'All Difficulties'
+                ? 'all difficulties'
+                : currentDifficultyFilter.toLowerCase();
+        filterLabel.textContent = 'All-time · ' + subjPart + ' · ' + diffPart;
     }
 
     SupabaseClient.getAllUsers()
@@ -66,9 +106,10 @@ function loadLeaderboard() {
                 })
             ).then(function (rows) {
                 var entries = rows.map(function (r) {
-                    var filtered = AccolyStats.filterAttemptsBySubject(
+                    var filtered = AccolyStats.filterAttempts(
                         r.attempts,
-                        currentSubjectFilter
+                        currentSubjectFilter,
+                        currentDifficultyFilter
                     );
                     var derived = AccolyStats.buildUserStatsFromAttempts(filtered);
                     var stats = AccolyStats.mergeStats(r.stats, derived);
@@ -130,7 +171,7 @@ function renderLeaderboardTable(sorted) {
     var tbody = document.getElementById('leaderboardBody');
     if (!sorted.length) {
         tbody.innerHTML =
-            '<tr><td colspan="7">No quiz scores yet. Complete a quiz to appear on the board.</td></tr>';
+            '<tr><td colspan="7">No quiz scores yet for this filter. Complete a quiz to appear on the board.</td></tr>';
     } else {
         tbody.innerHTML = sorted
             .map(function (entry) {
@@ -152,16 +193,11 @@ function renderLeaderboardTable(sorted) {
                         .join('')
                         .toUpperCase() +
                     '</div>' +
-                    '<div>' +
-                    '<div>' +
+                    '<div><div>' +
                     entry.userName +
-                    '</div>' +
-                    '<small style="color: var(--text-secondary);">' +
+                    '</div><small style="color: var(--text-secondary);">' +
                     entry.levelName +
-                    '</small>' +
-                    '</div>' +
-                    '</div>' +
-                    '</td>' +
+                    '</small></div></div></td>' +
                     '<td><span class="points-value">' +
                     entry.totalPoints +
                     '</span></td>' +

@@ -1,12 +1,4 @@
-var FLASH_SUBJECTS = [
-    'Financial Accounting',
-    'Cost Accounting',
-    'Auditing',
-    'Taxation',
-    'Business Law',
-    'Economics',
-    'Management Advisory Services'
-];
+var FLASH_SUBJECTS = ['FAR', 'AFAR', 'MS', 'AUD', 'RFBT', 'TAX'];
 var FLASH_DAILY_LIMIT = 15;
 var flashState = { subject: FLASH_SUBJECTS[0], index: 0, showBack: false, allCards: [] };
 

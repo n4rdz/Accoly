@@ -506,9 +506,14 @@ function renderSavedList() {
     SupabaseClient.getNotepadEntries(user.id)
         .then(function (entries) {
             var list = (entries || []).filter(function (e) {
-                var entryCode = window.AccolyStats
-                    ? AccolyStats.normalizeSubjectCode(e.subject)
-                    : e.subject || 'FAR';
+                var entryCode;
+                try {
+                    entryCode = window.AccolyStats && typeof AccolyStats.normalizeSubjectCode === 'function'
+                        ? AccolyStats.normalizeSubjectCode(e.subject)
+                        : (e.subject || 'FAR');
+                } catch (_) {
+                    entryCode = e.subject || 'FAR';
+                }
                 return entryCode === sub;
             }).sort(function (a, b) {
                 return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();

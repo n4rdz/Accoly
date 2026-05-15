@@ -304,6 +304,7 @@ function submitQuiz() {
     const user = Storage.getCurrentUser();
     const attempt = {
         userId: user.id,
+        moduleId: currentQuizModule.id,
         subject: currentQuizModule.subject,
         difficulty: currentQuizModule.difficulty,
         score: score,
@@ -312,10 +313,21 @@ function submitQuiz() {
         timeTaken: timeTaken,
         xpEarned: xpEarned
     };
+    if (!user || !user.id) {
+        AccountifyUI.toast('You must be logged in to save quiz results', 'error');
+        showResults(score, correctCount, timeTaken, xpEarned);
+        return;
+    }
+
     SupabaseClient.saveQuizAttempt(attempt)
         .then(function (saved) {
-            if (!saved) {
-                console.error('Failed to persist quiz attempt');
+            if (!saved || saved.error) {
+                var msg = (saved && saved.error && saved.error.message) ? saved.error.message : 'Could not save quiz to the server';
+                console.error('Failed to persist quiz attempt:', saved && saved.error ? saved.error : saved);
+                if (window.AccountifyUI) {
+                    AccountifyUI.toast('Quiz finished, but save failed: ' + msg + '. Run scripts/005_docs_quiz_attempts_align.sql in Supabase.', 'error');
+                }
+                return null;
             }
             return SupabaseClient.syncUserStatsFromAttempts(user.id);
         })
@@ -323,15 +335,18 @@ function submitQuiz() {
             return SupabaseClient.addNotification({
                 userId: user.id,
                 message: 'You completed the ' + currentQuizModule.name + ' quiz! Score: ' + score + '%'
-            });
+            }).catch(function () {});
         })
         .then(function () {
             if (window.AccountifyNav) {
-                return AccountifyNav.refreshNotifications();
+                return AccountifyNav.refreshNotifications().catch(function () {});
             }
         })
         .catch(function (err) {
             console.error('Quiz save error:', err);
+            if (window.AccountifyUI) {
+                AccountifyUI.toast('Quiz save error. Check console (F12) and Supabase table setup.', 'error');
+            }
         })
         .finally(function () {
             showResults(score, correctCount, timeTaken, xpEarned);

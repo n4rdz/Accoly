@@ -5,56 +5,48 @@
 const QUIZ_MODULES = [
     {
         id: 1,
-        name: 'Financial Accounting',
-        subject: 'Financial Accounting',
+        name: 'FAR',
+        subject: 'FAR',
         difficulty: 'Easy',
         color: 'from-blue-500 to-blue-600',
         icon: '📊'
     },
     {
         id: 2,
-        name: 'Cost Accounting',
-        subject: 'Cost Accounting',
+        name: 'AFAR',
+        subject: 'AFAR',
         difficulty: 'Medium',
         color: 'from-purple-500 to-purple-600',
-        icon: '💰'
+        icon: '📑'
     },
     {
         id: 3,
-        name: 'Auditing',
-        subject: 'Auditing',
+        name: 'AUD',
+        subject: 'AUD',
         difficulty: 'Hard',
         color: 'from-green-500 to-green-600',
         icon: '🔍'
     },
     {
         id: 4,
-        name: 'Taxation',
-        subject: 'Taxation',
+        name: 'TAX',
+        subject: 'TAX',
         difficulty: 'Medium',
         color: 'from-orange-500 to-orange-600',
         icon: '📋'
     },
     {
         id: 5,
-        name: 'Business Law',
-        subject: 'Business Law',
+        name: 'RFBT',
+        subject: 'RFBT',
         difficulty: 'Easy',
         color: 'from-red-500 to-red-600',
         icon: '⚖️'
     },
     {
         id: 6,
-        name: 'Economics',
-        subject: 'Economics',
-        difficulty: 'Medium',
-        color: 'from-cyan-500 to-cyan-600',
-        icon: '📈'
-    },
-    {
-        id: 7,
-        name: 'Management Advisory Services',
-        subject: 'MAS',
+        name: 'MS',
+        subject: 'MS',
         difficulty: 'Elite',
         color: 'from-indigo-500 to-indigo-600',
         icon: '💼'
@@ -672,129 +664,7 @@ const QUIZ_QUESTIONS = {
             explanation: 'A bailment is the temporary possession of another\'s property for a specific purpose.'
         }
     ],
-    6: [ // Economics
-        {
-            id: 1,
-            question: 'Economics is the study of:',
-            options: [
-                'A) Money and banking',
-                'B) Scarcity and choice',
-                'C) Business only',
-                'D) Government policies'
-            ],
-            correct: 1,
-            explanation: 'Economics studies how societies allocate scarce resources among unlimited wants.'
-        },
-        {
-            id: 2,
-            question: 'Supply and demand curves intersect at:',
-            options: [
-                'A) Maximum price',
-                'B) Equilibrium price',
-                'C) Minimum price',
-                'D) Market failure'
-            ],
-            correct: 1,
-            explanation: 'The intersection represents market equilibrium where quantity supplied equals quantity demanded.'
-        },
-        {
-            id: 3,
-            question: 'Inflation means:',
-            options: [
-                'A) Increase in income',
-                'B) Increase in price levels',
-                'C) Increase in production',
-                'D) Increase in employment'
-            ],
-            correct: 1,
-            explanation: 'Inflation is a sustained increase in the general price level of goods and services.'
-        },
-        {
-            id: 4,
-            question: 'Opportunity cost is:',
-            options: [
-                'A) The cost of production',
-                'B) The next best alternative forgone',
-                'C) The cost of opportunity',
-                'D) A lost business chance'
-            ],
-            correct: 1,
-            explanation: 'Opportunity cost is the value of the next best alternative given up.'
-        },
-        {
-            id: 5,
-            question: 'GDP measures:',
-            options: [
-                'A) Government spending',
-                'B) Gross total output',
-                'C) Total market value of goods/services',
-                'D) National debt'
-            ],
-            correct: 2,
-            explanation: 'GDP is the total market value of final goods and services produced in a country.'
-        },
-        {
-            id: 6,
-            question: 'Comparative advantage means:',
-            options: [
-                'A) Producing more efficiently',
-                'B) Lower opportunity cost',
-                'C) Better quality products',
-                'D) Price leadership'
-            ],
-            correct: 1,
-            explanation: 'Comparative advantage means producing at a lower opportunity cost.'
-        },
-        {
-            id: 7,
-            question: 'Elasticity of demand measures:',
-            options: [
-                'A) Product quality',
-                'B) Price responsiveness of quantity demanded',
-                'C) Supply changes',
-                'D) Income changes'
-            ],
-            correct: 1,
-            explanation: 'Elasticity measures how quantity demanded responds to price changes.'
-        },
-        {
-            id: 8,
-            question: 'Marginal utility is:',
-            options: [
-                'A) Total satisfaction',
-                'B) Additional satisfaction from one more unit',
-                'C) Average satisfaction',
-                'D) Maximum satisfaction'
-            ],
-            correct: 1,
-            explanation: 'Marginal utility is the additional satisfaction gained from consuming one more unit.'
-        },
-        {
-            id: 9,
-            question: 'Consumer surplus is:',
-            options: [
-                'A) Extra money consumers have',
-                'B) Excess goods produced',
-                'C) Difference between price paid and willingness to pay',
-                'D) Total consumer spending'
-            ],
-            correct: 2,
-            explanation: 'Consumer surplus is the difference between what consumers pay and what they\'re willing to pay.'
-        },
-        {
-            id: 10,
-            question: 'Recession is characterized by:',
-            options: [
-                'A) Declining GDP',
-                'B) Rising unemployment',
-                'C) Reduced consumer spending',
-                'D) All of the above'
-            ],
-            correct: 3,
-            explanation: 'Recession involves declining GDP, rising unemployment, and reduced economic activity.'
-        }
-    ],
-    7: [ // Management Advisory Services
+    6: [ // MS — Management Services
         {
             id: 1,
             question: 'MAS primarily focuses on:',
@@ -917,3 +787,4 @@ const QUIZ_QUESTIONS = {
         }
     ]
 };
+

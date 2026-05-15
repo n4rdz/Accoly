@@ -131,26 +131,67 @@ const SupabaseClient = {
     // ── Quiz attempts ────────────────────────────────────────────────────────
 
     saveQuizAttempt: async function (attempt) {
+        const now = new Date().toISOString();
+        const score = typeof attempt.score === 'number' ? attempt.score : 0;
+        const timeTaken = attempt.timeTaken != null ? attempt.timeTaken : null;
+        var accuracyPct = score;
+        if (window.AccolyStats && typeof AccolyStats.computeAttemptAccuracy === 'function') {
+            accuracyPct = AccolyStats.computeAttemptAccuracy({
+                score: score,
+                totalQuestions: attempt.totalQuestions || 10,
+                timeTaken: timeTaken || 0
+            });
+        }
         const row = {
             user_id: attempt.userId,
             subject: attempt.subject || '',
             difficulty: attempt.difficulty || '',
-            score: attempt.score || 0,
+            score: score,
             correct_answers: attempt.correctAnswers || 0,
             total_questions: attempt.totalQuestions || 0,
             xp_earned: attempt.xpEarned || 0,
-            created_at: new Date().toISOString()
+            accuracy_percentage: accuracyPct,
+            is_valid: true,
+            created_at: now,
+            completed_at: now
         };
-        if (attempt.timeTaken != null) row.time_taken = attempt.timeTaken;
-        const { data, error } = await _sb.from('quiz_attempts').insert(row).select().single();
-        if (error || !data) return null;
-        return data;
+        if (timeTaken != null) {
+            row.time_taken = timeTaken;
+            row.time_spent = timeTaken;
+        }
+        var result = await _sb.from('quiz_attempts').insert(row).select().single();
+        if (result.error) {
+            var legacyRow = {
+                user_id: attempt.userId,
+                score: score,
+                total_questions: attempt.totalQuestions || 0,
+                time_spent: timeTaken,
+                completed_at: now
+            };
+            if (attempt.moduleId) legacyRow.module_id = attempt.moduleId;
+            result = await _sb.from('quiz_attempts').insert(legacyRow).select().single();
+        }
+        if (result.error) {
+            console.error('[Accoly] saveQuizAttempt failed:', result.error.message, result.error.details || '', result.error.hint || '', result.error.code || '');
+            return { error: result.error };
+        }
+        if (!result.data) return null;
+        return result.data;
     },
 
     getQuizAttempts: async function (userId) {
-        const { data, error } = await _sb.from('quiz_attempts').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-        if (error || !data) return [];
-        return data.map(function (a) {
+        const { data, error } = await _sb.from('quiz_attempts').select('*').eq('user_id', userId);
+        if (error) {
+            console.error('[Accoly] getQuizAttempts failed:', error.message);
+            return [];
+        }
+        if (!data) return [];
+        var sorted = data.slice().sort(function (a, b) {
+            var ta = new Date(a.created_at || a.completed_at || 0).getTime();
+            var tb = new Date(b.created_at || b.completed_at || 0).getTime();
+            return tb - ta;
+        });
+        return sorted.map(function (a) {
             return {
                 id: a.id,
                 userId: a.user_id,
@@ -159,9 +200,9 @@ const SupabaseClient = {
                 score: a.score,
                 correctAnswers: a.correct_answers,
                 totalQuestions: a.total_questions,
-                xpEarned: a.xp_earned,
+                xpEarned: a.xp_earned || 0,
                 timeTaken: a.time_taken || a.time_spent || 0,
-                timestamp: a.created_at
+                timestamp: a.created_at || a.completed_at
             };
         });
     },
@@ -347,5 +388,255 @@ const SupabaseClient = {
         return items.filter(function (n) {
             return !n.read;
         }).length;
+    },
+
+    // ── Note PDFs (metadata + storage) ────────────────────────────────────────
+
+    getPdfMetaList: async function (userId) {
+        const { data, error } = await _sb.from('note_pdfs').select('*').eq('user_id', userId).order('updated_at', { ascending: false });
+        if (error || !data) return [];
+        return data.map(function (m) {
+            return {
+                id: m.id,
+                userId: m.user_id,
+                name: m.name,
+                subject: m.subject || 'General',
+                createdAt: m.created_at,
+                updatedAt: m.updated_at,
+                lastOpenedAt: m.last_opened_at,
+                sourceId: m.source_id,
+                favorite: !!m.favorite,
+                thumbnail: m.thumbnail || '',
+                annotationCount: m.annotation_count || 0,
+                isEdited: !!m.is_edited,
+                storagePath: m.storage_path
+            };
+        });
+    },
+
+    savePdfMeta: async function (meta) {
+        const now = new Date().toISOString();
+        if (!meta.id) {
+            meta.id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : 'pdf-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+        }
+        const storagePath = meta.storagePath || (meta.userId + '/' + meta.id + '.pdf');
+        const row = {
+            id: meta.id,
+            user_id: meta.userId,
+            name: meta.name || 'Untitled.pdf',
+            subject: meta.subject || 'General',
+            storage_path: storagePath,
+            thumbnail: meta.thumbnail || '',
+            favorite: !!meta.favorite,
+            annotation_count: typeof meta.annotationCount === 'number' ? meta.annotationCount : 0,
+            is_edited: !!meta.isEdited,
+            last_opened_at: meta.lastOpenedAt || null,
+            source_id: meta.sourceId || null,
+            updated_at: meta.updatedAt || now
+        };
+        if (!meta.createdAt) row.created_at = now;
+        const { data, error } = await _sb.from('note_pdfs').upsert(row).select().single();
+        if (error || !data) return null;
+        return {
+            id: data.id,
+            userId: data.user_id,
+            name: data.name,
+            subject: data.subject,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+            lastOpenedAt: data.last_opened_at,
+            sourceId: data.source_id,
+            favorite: !!data.favorite,
+            thumbnail: data.thumbnail || '',
+            annotationCount: data.annotation_count || 0,
+            isEdited: !!data.is_edited,
+            storagePath: data.storage_path
+        };
+    },
+
+    deletePdfMeta: async function (fileId) {
+        const { data: meta } = await _sb.from('note_pdfs').select('storage_path').eq('id', fileId).maybeSingle();
+        if (meta && meta.storage_path) {
+            await _sb.storage.from('note-pdfs').remove([meta.storage_path]);
+        }
+        await _sb.from('pdf_annotations').delete().eq('file_id', fileId);
+        const { error } = await _sb.from('note_pdfs').delete().eq('id', fileId);
+        return !error;
+    },
+
+    savePdfBinary: async function (entry) {
+        const path = entry.userId + '/' + entry.id + '.pdf';
+        const { error } = await _sb.storage.from('note-pdfs').upload(path, entry.blob, {
+            upsert: true,
+            contentType: entry.blob.type || 'application/pdf'
+        });
+        if (error) return null;
+        await _sb.from('note_pdfs').update({ storage_path: path }).eq('id', entry.id);
+        return path;
+    },
+
+    getPdfBinary: async function (id) {
+        const { data: meta, error: metaErr } = await _sb.from('note_pdfs').select('id, user_id, name, storage_path').eq('id', id).single();
+        if (metaErr || !meta) return null;
+        const storagePath = meta.storage_path || (meta.user_id + '/' + meta.id + '.pdf');
+        const { data: blob, error } = await _sb.storage.from('note-pdfs').download(storagePath);
+        if (error || !blob) return null;
+        return {
+            id: meta.id,
+            userId: meta.user_id,
+            name: meta.name,
+            blob: blob
+        };
+    },
+
+    deletePdfBinary: async function (id) {
+        return SupabaseClient.deletePdfMeta(id);
+    },
+
+    getPdfAnnotationsV2: async function (fileId) {
+        const { data, error } = await _sb.from('pdf_annotations').select('pages, updated_at').eq('file_id', fileId).maybeSingle();
+        if (error || !data) return { pages: {}, updatedAt: null };
+        return { pages: data.pages || {}, updatedAt: data.updated_at || null };
+    },
+
+    savePdfAnnotationsV2: async function (fileId, payload, userId) {
+        const row = {
+            file_id: fileId,
+            user_id: userId,
+            pages: payload && payload.pages ? payload.pages : {},
+            updated_at: new Date().toISOString()
+        };
+        const { error } = await _sb.from('pdf_annotations').upsert(row);
+        return !error;
+    },
+
+    deletePdfAnnotationsV2: async function (fileId) {
+        const { error } = await _sb.from('pdf_annotations').delete().eq('file_id', fileId);
+        return !error;
+    },
+
+    // ── Notepad ───────────────────────────────────────────────────────────────
+
+    getNotepadEntries: async function (userId) {
+        const { data, error } = await _sb.from('notepad_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+        if (error || !data) return [];
+        return data.map(function (e) {
+            return {
+                id: e.id,
+                userId: e.user_id,
+                subject: e.subject || 'FAR',
+                imageData: e.image_data,
+                previewDataUrl: e.preview_data_url,
+                drawDataUrl: e.draw_data_url,
+                bgType: e.bg_type || 'white',
+                createdAt: e.created_at
+            };
+        });
+    },
+
+    saveNotepadEntry: async function (entry) {
+        const row = {
+            user_id:         entry.userId,
+            subject:         entry.subject  || 'FAR',
+            image_data:      entry.imageData      || null,
+            preview_data_url: entry.previewDataUrl || null,
+            draw_data_url:   entry.drawDataUrl    || null,
+            bg_type:         entry.bgType         || 'white'
+        };
+        if (entry.id) {
+            // Update existing entry
+            const { data, error } = await _sb.from('notepad_entries').update(row).eq('id', entry.id).select().single();
+            if (error || !data) return null;
+            return { id: data.id, ...entry };
+        } else {
+            // Insert new entry
+            const { data, error } = await _sb.from('notepad_entries').insert(row).select().single();
+            if (error || !data) return null;
+            return { id: data.id, ...entry };
+        }
+    },
+
+    deleteNotepadEntry: async function (id) {
+        const { error } = await _sb.from('notepad_entries').delete().eq('id', id);
+        return !error;
+    },
+
+    // ── Groups (messages) ─────────────────────────────────────────────────────
+
+    getGroupsForUser: async function (userId) {
+        const { data, error } = await _sb.from('groups').select('*').contains('member_ids', [userId]).order('created_at', { ascending: false });
+        if (error || !data) return [];
+        return data.map(function (g) {
+            return {
+                id: g.id,
+                name: g.name,
+                subject: g.subject || 'FAR',
+                createdBy: g.created_by,
+                memberIds: Array.isArray(g.member_ids) ? g.member_ids : [],
+                createdAt: g.created_at
+            };
+        });
+    },
+
+    saveGroup: async function (group) {
+        const row = {
+            name: group.name,
+            subject: group.subject || 'FAR',
+            created_by: group.createdBy,
+            member_ids: group.memberIds || []
+        };
+        const { data, error } = await _sb.from('groups').insert(row).select().single();
+        if (error || !data) return null;
+        return {
+            id: data.id,
+            name: data.name,
+            subject: data.subject,
+            createdBy: data.created_by,
+            memberIds: data.member_ids || [],
+            createdAt: data.created_at
+        };
+    },
+
+    addMemberToGroup: async function (groupId, userId) {
+        const { data: group, error: fetchErr } = await _sb.from('groups').select('member_ids, created_by').eq('id', groupId).single();
+        if (fetchErr || !group) return false;
+        var members = Array.isArray(group.member_ids) ? group.member_ids.slice() : [];
+        if (members.indexOf(userId) !== -1) return true;
+        members.push(userId);
+        const { error } = await _sb.from('groups').update({ member_ids: members }).eq('id', groupId);
+        return !error;
+    },
+
+    getGroupMessages: async function (groupId) {
+        const { data, error } = await _sb.from('group_messages').select('*').eq('group_id', groupId).order('created_at', { ascending: true });
+        if (error || !data) return [];
+        return data.map(function (m) {
+            return {
+                id: m.id,
+                groupId: m.group_id,
+                fromUserId: m.from_user_id,
+                body: m.body,
+                createdAt: m.created_at
+            };
+        });
+    },
+
+    saveGroupMessage: async function (msg) {
+        const { data, error } = await _sb.from('group_messages').insert({
+            group_id: msg.groupId,
+            from_user_id: msg.fromUserId,
+            body: msg.body,
+            created_at: new Date().toISOString()
+        }).select().single();
+        if (error || !data) return null;
+        return {
+            id: data.id,
+            groupId: data.group_id,
+            fromUserId: data.from_user_id,
+            body: data.body,
+            createdAt: data.created_at
+        };
     }
 };

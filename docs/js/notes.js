@@ -860,6 +860,16 @@ function clearCurrentPage() {
     markDirty();
 }
 
+function selectAnno(type, pageNum, id) {
+    PDF.selected = { type: type, page: pageNum, id: id };
+    document.querySelectorAll('.pdf-textbox, .pdf-sticky-note').forEach(function (el) {
+        var match = el.dataset.id === id;
+        el.classList.toggle('anno-selected', match);
+        var chip = el.querySelector('.anno-del-chip');
+        if (chip) chip.hidden = !match;
+    });
+}
+
 function clearSelection() {
     PDF.selected = null;
     document.querySelectorAll('.pdf-textbox, .pdf-sticky-note').forEach(function (el) {
@@ -1076,17 +1086,24 @@ function blobToUint8Array(blob) {
 
 function bindBasicNoteModal() {
     var modal = document.getElementById('noteModal');
-    document.getElementById('btnNewNote').addEventListener('click', function () { openSimpleNoteModal(null); });
-    document.getElementById('noteModalClose').addEventListener('click', closeSimpleNoteModal);
-    document.getElementById('noteCancelBtn').addEventListener('click', closeSimpleNoteModal);
-    document.getElementById('noteSaveBtn').addEventListener('click', saveSimpleNoteModal);
+    if (!modal) return;
+    var btnNew = document.getElementById('btnNewNote');
+    if (btnNew) btnNew.addEventListener('click', function () { openSimpleNoteModal(null); });
+    var closeBtn = document.getElementById('noteModalClose');
+    var cancelBtn = document.getElementById('noteCancelBtn');
+    var saveBtn = document.getElementById('noteSaveBtn');
+    if (closeBtn) closeBtn.addEventListener('click', closeSimpleNoteModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeSimpleNoteModal);
+    if (saveBtn) saveBtn.addEventListener('click', saveSimpleNoteModal);
     modal.addEventListener('click', function (e) { if (e.target && e.target.id === 'noteModal') closeSimpleNoteModal(); });
     var sel = document.getElementById('noteSubject');
-    sel.innerHTML = getNoteSubjectCodes()
-        .map(function (s) {
-            return '<option value="' + escAttr(s) + '">' + esc(noteSubjectLabel(s)) + '</option>';
-        })
-        .join('');
+    if (sel) {
+        sel.innerHTML = getNoteSubjectCodes()
+            .map(function (s) {
+                return '<option value="' + escAttr(s) + '">' + esc(noteSubjectLabel(s)) + '</option>';
+            })
+            .join('');
+    }
 }
 
 function openSimpleNoteModal() { document.getElementById('noteTitle').value = ''; document.getElementById('noteContent').value = ''; document.getElementById('noteModal').classList.add('open'); }

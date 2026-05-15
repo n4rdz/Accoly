@@ -1,15 +1,42 @@
-// Shared quiz stats: points, accuracy (score + time), levels, streaks
+// Shared quiz stats: points, accuracy (score + time), levels, streaks, CPA subjects
 (function () {
-    var QUIZ_SUBJECTS = [
-        'All Subjects',
-        'Financial Accounting',
-        'Cost Accounting',
-        'Auditing',
-        'Taxation',
-        'Business Law',
-        'Economics',
-        'MAS'
+    var SUBJECT_CATALOG = [
+        { code: 'FAR', label: 'Financial Accounting and Reporting', short: 'FAR' },
+        { code: 'AFAR', label: 'Advanced Financial Accounting and Reporting', short: 'AFAR' },
+        { code: 'MS', label: 'Management Services', short: 'MS' },
+        { code: 'AUD', label: 'Auditing', short: 'AUD' },
+        { code: 'RFBT', label: 'Regulatory Framework and Business Transactions', short: 'RFBT' },
+        { code: 'TAX', label: 'Taxation', short: 'TAX' }
     ];
+
+    var LEGACY_SUBJECT_MAP = {
+        'Financial Accounting': 'FAR',
+        'Cost Accounting': 'AFAR',
+        'Advanced Financial Accounting': 'AFAR',
+        'Management Advisory Services': 'MS',
+        'MAS': 'MS',
+        'Management Services': 'MS',
+        'Auditing': 'AUD',
+        'Business Law': 'RFBT',
+        'Regulatory Framework': 'RFBT',
+        'Economics': 'RFBT',
+        'Taxation': 'TAX',
+        'General': 'FAR',
+        'FAR': 'FAR',
+        'AFAR': 'AFAR',
+        'MS': 'MS',
+        'AUD': 'AUD',
+        'RFBT': 'RFBT',
+        'TAX': 'TAX'
+    };
+
+    var QUIZ_SUBJECTS = ['All Subjects'].concat(
+        SUBJECT_CATALOG.map(function (c) {
+            return c.code;
+        })
+    );
+
+    var QUIZ_DIFFICULTIES = ['All Difficulties', 'Easy', 'Medium', 'Hard', 'Elite'];
 
     var LEVEL_TIERS = [
         { level: 1, name: 'Beginner Accountant', xpRequired: 0, emoji: '📚' },
@@ -18,6 +45,35 @@
         { level: 4, name: 'Audit Specialist', xpRequired: 3500, emoji: '✓' },
         { level: 5, name: 'CPA Elite', xpRequired: 7000, emoji: '👑' }
     ];
+
+    function normalizeSubjectCode(raw) {
+        var s = (raw || '').trim();
+        if (!s) return '';
+        if (LEGACY_SUBJECT_MAP[s]) return LEGACY_SUBJECT_MAP[s];
+        var upper = s.toUpperCase();
+        var hit = SUBJECT_CATALOG.find(function (c) {
+            return c.code === upper;
+        });
+        return hit ? hit.code : s;
+    }
+
+    function getSubjectLabel(code) {
+        var norm = normalizeSubjectCode(code);
+        var row = SUBJECT_CATALOG.find(function (c) {
+            return c.code === norm;
+        });
+        return row ? row.code + ' — ' + row.label : code || 'Unknown';
+    }
+
+    function getSubjectShortLabel(code) {
+        return normalizeSubjectCode(code) || code || 'Unknown';
+    }
+
+    function getSubjectOptions() {
+        return SUBJECT_CATALOG.map(function (c) {
+            return { value: c.code, label: c.code + ' — ' + c.label };
+        });
+    }
 
     function computeAttemptAccuracy(attempt) {
         var score = typeof attempt.score === 'number' ? attempt.score : 0;
@@ -34,9 +90,25 @@
 
     function filterAttemptsBySubject(attempts, subjectFilter) {
         if (!subjectFilter || subjectFilter === 'All Subjects') return attempts || [];
+        var code = normalizeSubjectCode(subjectFilter);
         return (attempts || []).filter(function (a) {
-            return (a.subject || '') === subjectFilter;
+            return normalizeSubjectCode(a.subject) === code;
         });
+    }
+
+    function filterAttemptsByDifficulty(attempts, difficultyFilter) {
+        if (!difficultyFilter || difficultyFilter === 'All Difficulties') return attempts || [];
+        var d = difficultyFilter;
+        return (attempts || []).filter(function (a) {
+            var diff = (a.difficulty || '').replace('Super Hard', 'Elite');
+            if (d === 'Medium') return diff === 'Medium' || diff === 'Intermediate';
+            return diff === d;
+        });
+    }
+
+    function filterAttempts(attempts, subjectFilter, difficultyFilter) {
+        var list = filterAttemptsBySubject(attempts, subjectFilter);
+        return filterAttemptsByDifficulty(list, difficultyFilter);
     }
 
     function computeTotalPoints(attempts) {
@@ -144,10 +216,18 @@
     }
 
     window.AccolyStats = {
+        SUBJECT_CATALOG: SUBJECT_CATALOG,
         QUIZ_SUBJECTS: QUIZ_SUBJECTS,
+        QUIZ_DIFFICULTIES: QUIZ_DIFFICULTIES,
         LEVEL_TIERS: LEVEL_TIERS,
+        normalizeSubjectCode: normalizeSubjectCode,
+        getSubjectLabel: getSubjectLabel,
+        getSubjectShortLabel: getSubjectShortLabel,
+        getSubjectOptions: getSubjectOptions,
         computeAttemptAccuracy: computeAttemptAccuracy,
         filterAttemptsBySubject: filterAttemptsBySubject,
+        filterAttemptsByDifficulty: filterAttemptsByDifficulty,
+        filterAttempts: filterAttempts,
         computeTotalPoints: computeTotalPoints,
         aggregateAccuracy: aggregateAccuracy,
         computeStudyStreak: computeStudyStreak,

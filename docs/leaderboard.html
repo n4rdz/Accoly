@@ -22,6 +22,10 @@
                     <span class="nav-icon">📊</span>
                     <span>Dashboard</span>
                 </a>
+                <a href="notes.html" class="nav-item">
+                    <span class="nav-icon">📄</span>
+                    <span>PDF</span>
+                </a>
                 <a href="community.html" class="nav-item">
                     <span class="nav-icon">🧑‍🤝‍🧑</span>
                     <span>Community</span>
@@ -113,9 +117,12 @@
 
                 <!-- Subject filter -->
                 <div class="leaderboard-filter">
-                    <h3>Subject</h3>
-                    <p id="leaderboardFilterLabel" style="margin:0 0 0.75rem;color:var(--text-secondary);font-size:0.9rem;">All-time · all subjects</p>
+                    <h3>Ranking filters</h3>
+                    <p id="leaderboardFilterLabel" style="margin:0 0 0.75rem;color:var(--text-secondary);font-size:0.9rem;">All-time · all subjects · all difficulties</p>
+                    <p style="margin:0 0 0.35rem;font-size:0.85rem;color:var(--text-secondary);">Subject (all-time points from quiz scores)</p>
                     <div class="filter-buttons" id="subjectFilterButtons"></div>
+                    <p style="margin:1rem 0 0.35rem;font-size:0.85rem;color:var(--text-secondary);">Difficulty</p>
+                    <div class="filter-buttons" id="difficultyFilterButtons"></div>
                 </div>
 
                 <!-- Leaderboard Table -->
