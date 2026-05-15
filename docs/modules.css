@@ -2,7 +2,7 @@
    Notes, Notepad, Standards — module layouts
    ============================================ */
 
-.visually-hidden {
+   .visually-hidden {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1557,4 +1557,50 @@ body.notepad-fullscreen-canvas .dashboard-wrapper > .sidebar {
 body.notepad-fullscreen-canvas .dashboard-wrapper > .dashboard-main {
     width: 100%;
     max-width: 100%;
+}
+
+/* ── Notepad saved pages ─────────────────────────────────────────── */
+.saved-pages {
+    width: 180px;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-y: auto;
+    max-height: 520px;
+    padding-right: 0.25rem;
+}
+
+.saved-item {
+    background: var(--background, #fff);
+    border: 1.5px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.saved-item:hover,
+.saved-item.active {
+    border-color: var(--primary, #1E3A8A);
+    background: rgba(30, 58, 138, 0.04);
+}
+
+.saved-thumb {
+    width: 100%;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+    display: block;
+    background: #f8fafc;
+}
+
+.saved-item small {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-secondary, #64748b);
+    margin-top: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
