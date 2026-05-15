@@ -19,8 +19,24 @@ function initDashboard() {
     const user = Storage.getCurrentUser();
     if (!user) return; // auth.js already redirected if no session; just bail silently
 
-    const stats = Storage.getUserStats(user.id);
+    Promise.all([
+        SupabaseClient.getUserStats(user.id),
+        SupabaseClient.getNotes(user.id),
+        SupabaseClient.getQuizAttempts(user.id)
+    ])
+        .then(function (results) {
+            const stats = results[0];
+            const notes = results[1];
+            const attempts = results[2];
+            renderDashboardMain(user, stats, notes.length);
+            loadRecentActivityFromAttempts(attempts);
+        })
+        .catch(function (err) {
+            console.error('Dashboard load error:', err);
+        });
+}
 
+function renderDashboardMain(user, stats, notesCount) {
     // Header user chip
     const initials = user.fullName
         .split(' ')
@@ -62,7 +78,6 @@ function initDashboard() {
 
     // Notes / notepad counts
     try {
-        const notesCount = Storage.getNotes(user.id).length;
         const notepadCount = Storage.getNotepadEntries(user.id).length;
         const notesEl = document.getElementById('dashNotesCount');
         const padEl = document.getElementById('dashNotepadCount');
@@ -71,23 +86,11 @@ function initDashboard() {
     } catch (error) {
         console.error('Error counting user content:', error);
     }
-
-    // Recent activity
-    loadRecentActivity(user.id);
 }
 
-function loadRecentActivity(userId) {
+function loadRecentActivityFromAttempts(attempts) {
     const recentList = document.getElementById('recentActivityList');
     if (!recentList) return;
-
-    let attempts = [];
-    try {
-        attempts = Storage.getQuizAttempts(userId);
-    } catch (error) {
-        console.error('Error loading quiz attempts:', error);
-        recentList.innerHTML = '<p style="color: var(--text-secondary);">Error loading activity.</p>';
-        return;
-    }
 
     if (!attempts || attempts.length === 0) {
         recentList.innerHTML = '<p style="color: var(--text-secondary);">No recent activity. Start by taking a quiz!</p>';
@@ -95,6 +98,7 @@ function loadRecentActivity(userId) {
     }
 
     const recent = attempts
+        .slice()
         .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
         .slice(0, 5);
 

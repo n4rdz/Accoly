@@ -8,7 +8,7 @@ var FLASH_SUBJECTS = [
     'Management Advisory Services'
 ];
 var FLASH_DAILY_LIMIT = 15;
-var flashState = { subject: FLASH_SUBJECTS[0], index: 0, showBack: false };
+var flashState = { subject: FLASH_SUBJECTS[0], index: 0, showBack: false, allCards: [] };
 
 document.addEventListener('DOMContentLoaded', function () {
     if (window.__authReady) {
@@ -18,11 +18,36 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+function normalizeFlashcard(c) {
+    if (!c) return c;
+    c.front = c.front || c.question || '';
+    c.back = c.back || c.answer || '';
+    return c;
+}
+
+function reloadFlashcardsFromServer(user) {
+    return SupabaseClient.getFlashcards(user.id).then(function (cards) {
+        flashState.allCards = (cards || []).map(normalizeFlashcard);
+    });
+}
+
+function seedFlashcardsIfNeeded(user) {
+    if (flashState.allCards.length > 0) return Promise.resolve();
+    var jobs = FLASH_SUBJECTS.map(function (s) {
+        return SupabaseClient.saveFlashcard({
+            userId: 'seed',
+            subject: s,
+            question: 'Core idea of ' + s + '?',
+            answer: 'Review your summary notes and sample problem set for ' + s + '.'
+        });
+    });
+    return Promise.all(jobs);
+}
+
 function initFlashcards() {
     var user = Storage.getCurrentUser();
     if (!user) return; // auth.js already redirected
 
-    seedFlashcards();
     var sel = document.getElementById('flashSubject');
     FLASH_SUBJECTS.forEach(function (s) {
         var o = document.createElement('option');
@@ -49,22 +74,33 @@ function initFlashcards() {
         flashState.showBack = !flashState.showBack;
         renderFlashcard();
     });
-    renderFlashcard();
+
+    reloadFlashcardsFromServer(user)
+        .then(function () {
+            return seedFlashcardsIfNeeded(user);
+        })
+        .then(function () {
+            return reloadFlashcardsFromServer(user);
+        })
+        .then(function () {
+            renderFlashcard();
+        })
+        .catch(function (err) {
+            console.error('Flashcards init error:', err);
+            AccountifyUI.toast('Could not load flashcards', 'error');
+        });
 }
 
 function isPremiumUser() {
     return window.AccolySubscription ? AccolySubscription.isPremiumUser() : false;
 }
 
-function seedFlashcards() {
-    if ((Storage.getFlashcards() || []).length > 0) return;
-    FLASH_SUBJECTS.forEach(function (s) {
-        Storage.saveFlashcard({ userId: 'seed', subject: s, front: 'Core idea of ' + s + '?', back: 'Review your summary notes and sample problem set for ' + s + '.' });
-    });
-}
-
 function subjectCards() {
-    return Storage.getFlashcardsBySubject(flashState.subject);
+    var user = Storage.getCurrentUser();
+    if (!user) return [];
+    return (flashState.allCards || []).filter(function (c) {
+        return c.subject === flashState.subject && (c.userId === user.id || c.userId === 'seed');
+    });
 }
 
 function todayKey() {
@@ -104,13 +140,13 @@ function renderFlashcard() {
 function renderConfusion(cards) {
     var list = document.getElementById('confusionList');
     if (!list) return;
-    
+
     var confused = (cards || []).filter(function (c) { return (c.confusionCount || 0) > 0; });
     if (!confused.length) {
         list.innerHTML = '<p style="color:var(--text-secondary);">No confusing cards yet. Great job.</p>';
         return;
     }
-    
+
     list.innerHTML = confused
         .sort(function (a, b) { return (b.confusionCount || 0) - (a.confusionCount || 0); })
         .slice(0, 10)
@@ -141,12 +177,33 @@ function markCard(correct) {
 
     var card = cards[flashState.index];
     Storage.recordFlashReview(user.id, flashState.subject, todayKey(), correct);
+
+    function afterPersist() {
+        flashState.showBack = false;
+        moveCard(1);
+    }
+
     if (!correct) {
         card.confusionCount = (card.confusionCount || 0) + 1;
-        Storage.saveFlashcard(card);
+        SupabaseClient.saveFlashcard({
+            id: card.id,
+            userId: card.userId,
+            subject: card.subject,
+            question: card.front || card.question,
+            answer: card.back || card.answer,
+            confusionCount: card.confusionCount
+        })
+            .then(function (saved) {
+                if (saved) normalizeFlashcard(saved);
+            })
+            .catch(function (e) {
+                console.error(e);
+            })
+            .finally(afterPersist);
+        return;
     }
-    flashState.showBack = false;
-    moveCard(1);
+
+    afterPersist();
 }
 
 function openModal() {
@@ -165,50 +222,59 @@ function saveCard() {
         AccountifyUI.toast('Please login to save flashcards', 'error');
         return;
     }
-    
+
     var front = (document.getElementById('flashQuestion').value || '').trim();
     var back = (document.getElementById('flashAnswer').value || '').trim();
-    
-    // Input validation
+
     if (!front || !back) {
         AccountifyUI.toast('Both front and back are required', 'warning');
         return;
     }
-    
+
     if (front.length > 500 || back.length > 500) {
         AccountifyUI.toast('Text too long (max 500 characters each)', 'warning');
         return;
     }
-    
-    // Check for script injection
+
     if (/<script|javascript:|on\w+=/i.test(front + back)) {
         AccountifyUI.toast('Invalid content detected', 'error');
         return;
     }
-    
-    try {
-        Storage.saveFlashcard({ 
-            userId: user.id, 
-            subject: flashState.subject, 
-            front: front, 
-            back: back, 
-            confusionCount: 0 
+
+    SupabaseClient.saveFlashcard({
+        userId: user.id,
+        subject: flashState.subject,
+        question: front,
+        answer: back,
+        confusionCount: 0
+    })
+        .then(function (saved) {
+            if (!saved) {
+                AccountifyUI.toast('Failed to save flashcard', 'error');
+                return Promise.reject(new Error('save_failed'));
+            }
+            normalizeFlashcard(saved);
+            flashState.allCards.push(saved);
+            return SupabaseClient.addNotification({
+                userId: user.id,
+                message: 'A flashcard was added for ' + flashState.subject + '.'
+            });
+        })
+        .then(function () {
+            if (window.AccountifyNav) {
+                return AccountifyNav.refreshNotifications();
+            }
+        })
+        .then(function () {
+            closeModal();
+            AccountifyUI.toast('Flashcard saved successfully', 'success');
+            renderFlashcard();
+        })
+        .catch(function (error) {
+            if (error && error.message === 'save_failed') return;
+            console.error('Save flashcard error:', error);
+            AccountifyUI.toast('Failed to save flashcard', 'error');
         });
-        
-        Storage.addNotification({ 
-            userId: user.id, 
-            message: 'A flashcard was added for ' + esc(flashState.subject) + '.' 
-        });
-        
-        if (window.AccountifyNav) AccountifyNav.refreshNotifications();
-        
-        closeModal();
-        AccountifyUI.toast('Flashcard saved successfully', 'success');
-        renderFlashcard();
-    } catch (error) {
-        console.error('Save flashcard error:', error);
-        AccountifyUI.toast('Failed to save flashcard', 'error');
-    }
 }
 
 function resetDaily() {

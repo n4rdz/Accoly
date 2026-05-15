@@ -80,12 +80,13 @@ const SupabaseClient = {
     },
 
     updateProfile: async function (userId, updates) {
-        const { error } = await _sb.from('profiles').update({
-            full_name: updates.fullName,
-            role: updates.role,
-            subscription_status: updates.subscriptionStatus,
-            subscription_date: updates.subscriptionDate
-        }).eq('id', userId);
+        var row = {};
+        if (updates.fullName !== undefined) row.full_name = updates.fullName;
+        if (updates.role !== undefined) row.role = updates.role;
+        if (updates.subscriptionStatus !== undefined) row.subscription_status = updates.subscriptionStatus;
+        if (updates.subscriptionDate !== undefined) row.subscription_date = updates.subscriptionDate;
+        if (Object.keys(row).length === 0) return true;
+        const { error } = await _sb.from('profiles').update(row).eq('id', userId);
         return !error;
     },
 
@@ -290,5 +291,12 @@ const SupabaseClient = {
 
     markAllNotificationsRead: async function (userId) {
         await _sb.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
+    },
+
+    getUnreadNotificationCount: async function (userId) {
+        const items = await SupabaseClient.getNotifications(userId);
+        return items.filter(function (n) {
+            return !n.read;
+        }).length;
     }
 };

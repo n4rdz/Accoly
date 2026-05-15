@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function initSettings() {
-    var user = window.AccolySubscription ? AccolySubscription.getCurrentUserFresh() : Storage.getCurrentUser();
+    var user = Storage.getCurrentUser();
     if (!user) return; // auth.js already redirected
 
     var emailEl = document.getElementById('settingEmail');
@@ -25,7 +25,8 @@ function initSettings() {
 }
 
 function initSubscriptionPanel() {
-    var user = AccolySubscription.getCurrentUserFresh();
+    var user = Storage.getCurrentUser();
+    if (!user) return;
     var planName = document.getElementById('planName');
     var planMeta = document.getElementById('planMeta');
     var planBadge = document.getElementById('planBadge');
@@ -72,20 +73,25 @@ function closeSubscribeModal() {
 
 // Required by your spec
 function subscribeToPremium() {
-    var user = AccolySubscription.getCurrentUserFresh();
+    var user = Storage.getCurrentUser();
     if (!user) return false;
 
-    AccolySubscription.upgradeToPremium();
+    AccolySubscription.upgradeToPremium()
+        .then(function (ok) {
+            if (!ok) {
+                if (window.AccountifyUI) AccountifyUI.toast('Could not activate Premium. Try again.', 'error');
+                return;
+            }
+            if (AccolySubscription.applyPremiumLocks) AccolySubscription.applyPremiumLocks();
+            if (window.AccountifyNav) AccountifyNav.refreshNotifications();
+            closeSubscribeModal();
+            if (window.AccountifyUI) AccountifyUI.toast('Premium activated. Enjoy!', 'success');
+            initSubscriptionPanel();
+        })
+        .catch(function () {
+            if (window.AccountifyUI) AccountifyUI.toast('Could not activate Premium. Try again.', 'error');
+        });
 
-    // Instantly unlock premium UI across the app shell
-    if (AccolySubscription.applyPremiumLocks) AccolySubscription.applyPremiumLocks();
-    if (window.AccountifyNav) AccountifyNav.refreshNotifications();
-
-    closeSubscribeModal();
-    if (window.AccountifyUI) AccountifyUI.toast('Premium activated. Enjoy!', 'success');
-
-    // Refresh this page’s panel without a full reload
-    initSubscriptionPanel();
     return true;
 }
 

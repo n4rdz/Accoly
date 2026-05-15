@@ -312,18 +312,27 @@ function submitQuiz() {
         timeTaken: timeTaken,
         xpEarned: xpEarned
     };
-    Storage.saveQuizAttempt(attempt);
-
-    Storage.addNotification({
-        userId: user.id,
-        message: 'You completed the ' + currentQuizModule.name + ' quiz! Score: ' + score + '%'
-    });
-    if (window.AccountifyNav) {
-        AccountifyNav.refreshNotifications();
-    }
-
-    // Show results
-    showResults(score, correctCount, timeTaken, xpEarned);
+    SupabaseClient.saveQuizAttempt(attempt)
+        .then(function (saved) {
+            if (!saved) {
+                console.error('Failed to persist quiz attempt');
+            }
+            return SupabaseClient.addNotification({
+                userId: user.id,
+                message: 'You completed the ' + currentQuizModule.name + ' quiz! Score: ' + score + '%'
+            });
+        })
+        .then(function () {
+            if (window.AccountifyNav) {
+                return AccountifyNav.refreshNotifications();
+            }
+        })
+        .catch(function (err) {
+            console.error('Quiz save error:', err);
+        })
+        .finally(function () {
+            showResults(score, correctCount, timeTaken, xpEarned);
+        });
 }
 
 function showResults(score, correctCount, timeTaken, xpEarned) {

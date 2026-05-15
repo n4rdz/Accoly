@@ -262,9 +262,9 @@ function sendMessage() {
             if (g && Array.isArray(g.memberIds)) {
                 g.memberIds.forEach(function (id) {
                     if (id === me.id) return;
-                    Storage.addNotification({ userId: id, message: 'New group message in ' + esc(g.name || 'Group') });
+                    SupabaseClient.addNotification({ userId: id, message: 'New group message in ' + esc(g.name || 'Group') }).catch(function () {});
                 });
-                if (window.AccountifyNav) AccountifyNav.refreshNotifications();
+                if (window.AccountifyNav) AccountifyNav.refreshNotifications().catch(function () {});
             }
             renderChat();
             renderGroupList();

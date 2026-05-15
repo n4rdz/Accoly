@@ -70,15 +70,20 @@
                             <div class="grow">
                                 <input type="search" id="pdfSearch" class="module-search" placeholder="Search PDF files..." autocomplete="off" />
                             </div>
-                            <select id="pdfSort" class="sort-select">
-                                <option value="recent">Recently edited</option>
-                                <option value="name">Name A-Z</option>
-                                <option value="created">Upload date</option>
-                            </select>
+                            <div class="module-toolbar-actions">
+                                <input type="file" id="pdfUploadInput" accept=".pdf,application/pdf" hidden aria-hidden="true" />
+                                <button type="button" class="btn btn-primary" id="btnUploadPdf">Upload PDF</button>
+                                <select id="pdfSort" class="sort-select" aria-label="Sort files">
+                                    <option value="recent">Recently edited</option>
+                                    <option value="name">Name A-Z</option>
+                                    <option value="created">Upload date</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="manager-grid">
-                            <section class="card manager-section">
-                                <h3>Recent Files</h3>
+                            <section class="card manager-section pdf-drop-zone" id="pdfDropZone" aria-label="PDF library">
+                                <p class="pdf-drop-hint" id="pdfDropHint">Drag and drop a PDF here, or use <strong>Upload PDF</strong> (max 10 MB).</p>
+                                <h3>Your PDFs</h3>
                                 <div id="recentFilesList" class="pdf-file-grid"></div>
                             </section>
                         </div>

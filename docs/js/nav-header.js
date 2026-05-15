@@ -42,6 +42,18 @@
         closeUser();
     }
 
+    function openNotifPanel() {
+        var panel = $('navNotifPanel');
+        var btn = $('navNotifBtn');
+        if (!panel || !btn) return;
+        panel.hidden = false;
+        requestAnimationFrame(function () {
+            panel.classList.add('nav-dropdown--open');
+        });
+        setExpanded(btn, true);
+        notifOpen = true;
+    }
+
     function toggleNotif() {
         var user = Storage.getCurrentUser();
         var panel = $('navNotifPanel');
@@ -53,17 +65,22 @@
             return;
         }
         closeUser();
-        if (user) {
-            Storage.markAllNotificationsRead(user.id);
-            updateBadge();
-        }
-        renderNotifications();
-        panel.hidden = false;
-        requestAnimationFrame(function () {
-            panel.classList.add('nav-dropdown--open');
+
+        var p = user
+            ? SupabaseClient.markAllNotificationsRead(user.id)
+                .then(function () {
+                    return updateBadge();
+                })
+                .then(function () {
+                    return renderNotifications();
+                })
+            : renderNotifications();
+
+        p.catch(function (e) {
+            console.error(e);
+        }).finally(function () {
+            openNotifPanel();
         });
-        setExpanded(btn, true);
-        notifOpen = true;
     }
 
     function toggleUser() {
@@ -86,56 +103,57 @@
 
     function renderNotifications() {
         var listEl = $('navNotifList');
-        if (!listEl) return;
+        if (!listEl) return Promise.resolve();
 
         var user = Storage.getCurrentUser();
         if (!user) {
             listEl.innerHTML = '';
-            return;
+            return Promise.resolve();
         }
 
-        var items = Storage.getNotificationsForUser(user.id);
+        return SupabaseClient.getNotifications(user.id).then(function (items) {
+            if (!items.length) {
+                listEl.innerHTML =
+                    '<li class="nav-dropdown-empty">No notifications</li>';
+                return;
+            }
 
-        if (items.length === 0) {
-            listEl.innerHTML =
-                '<li class="nav-dropdown-empty">No notifications</li>';
-            return;
-        }
-
-        listEl.innerHTML = items
-            .map(function (n) {
-                var d = new Date(n.date);
-                var timeStr = d.toLocaleString();
-                var esc = function (s) {
-                    var x = document.createElement('div');
-                    x.textContent = s;
-                    return x.innerHTML;
-                };
-                return (
-                    '<li class="nav-notif-item">' +
-                    '<span class="nav-notif-msg">' +
-                    esc(n.message) +
-                    '</span>' +
-                    '<span class="nav-notif-date">' +
-                    esc(timeStr) +
-                    '</span>' +
-                    '</li>'
-                );
-            })
-            .join('');
+            listEl.innerHTML = items
+                .map(function (n) {
+                    var d = new Date(n.date);
+                    var timeStr = d.toLocaleString();
+                    var esc = function (s) {
+                        var x = document.createElement('div');
+                        x.textContent = s;
+                        return x.innerHTML;
+                    };
+                    return (
+                        '<li class="nav-notif-item">' +
+                        '<span class="nav-notif-msg">' +
+                        esc(n.message) +
+                        '</span>' +
+                        '<span class="nav-notif-date">' +
+                        esc(timeStr) +
+                        '</span>' +
+                        '</li>'
+                    );
+                })
+                .join('');
+        });
     }
 
     function updateBadge() {
         var badge = $('navNotifBadge');
         var user = Storage.getCurrentUser();
-        if (!badge || !user) return;
-        var n = Storage.getUnreadNotificationCount(user.id);
-        if (n > 0) {
-            badge.textContent = n > 99 ? '99+' : String(n);
-            badge.hidden = false;
-        } else {
-            badge.hidden = true;
-        }
+        if (!badge || !user) return Promise.resolve();
+        return SupabaseClient.getUnreadNotificationCount(user.id).then(function (n) {
+            if (n > 0) {
+                badge.textContent = n > 99 ? '99+' : String(n);
+                badge.hidden = false;
+            } else {
+                badge.hidden = true;
+            }
+        });
     }
 
     function fillUserChip() {
@@ -201,8 +219,8 @@
         }
 
         fillUserChip();
-        updateBadge();
-        renderNotifications();
+        updateBadge().catch(function () {});
+        renderNotifications().catch(function () {});
 
         if (notifBtn) {
             notifBtn.addEventListener('click', function (e) {
@@ -227,21 +245,22 @@
         document.addEventListener('click', onDocClick);
         document.addEventListener('keydown', onKey);
 
-        // Cross-tab / same-browser realtime refresh
         window.addEventListener('storage', function (e) {
             if (!e || !e.key) return;
             if (e.key === 'notifications' || e.key === 'currentUser') {
                 fillUserChip();
-                renderNotifications();
-                updateBadge();
+                renderNotifications().catch(function () {});
+                updateBadge().catch(function () {});
             }
         });
     });
 
     window.AccountifyNav = {
         refreshNotifications: function () {
-            renderNotifications();
-            updateBadge();
+            return Promise.all([
+                renderNotifications(),
+                updateBadge()
+            ]);
         },
         updateBadge: updateBadge
     };

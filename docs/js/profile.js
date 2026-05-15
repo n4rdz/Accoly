@@ -17,44 +17,105 @@ function initProfile() {
     loadProfile();
 }
 
-// HTML escaping utility
 function esc(s) {
     var d = document.createElement('div');
     d.textContent = s || '';
     return d.innerHTML;
 }
 
+function setProfileLoading(on) {
+    var overlay = document.getElementById('profileLoadingOverlay');
+    if (!overlay) return;
+    overlay.hidden = !on;
+    overlay.setAttribute('aria-busy', on ? 'true' : 'false');
+}
+
+function safeDate(ts) {
+    if (!ts) return null;
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return null;
+    return d;
+}
+
 function loadProfile() {
     const user = Storage.getCurrentUser();
     if (!user) return;
-    
-    const stats = Storage.getUserStats(user.id);
 
-    // Set user info with proper escaping
-    const initials = user.fullName.split(' ').map(n => n[0]).join('').toUpperCase();
+    var errEl = document.getElementById('profileFetchError');
+    if (errEl) {
+        errEl.hidden = true;
+        errEl.textContent = '';
+    }
+
+    setProfileLoading(true);
+
+    Promise.all([
+        SupabaseClient.getUserStats(user.id),
+        SupabaseClient.getQuizAttempts(user.id),
+        SupabaseClient.getPosts()
+    ])
+        .then(function (results) {
+            const stats = results[0];
+            const attempts = results[1];
+            const posts = results[2];
+            renderProfileHeader(user, stats, posts);
+            renderAchievements(stats);
+            renderSubjectRatingsFromAttempts(attempts);
+            loadRecentQuizzesFromAttempts(attempts);
+            renderStudyChartFromAttempts(attempts);
+            renderStudyCalendarFromAttempts(attempts);
+            if (window.AccolySubscription && AccolySubscription.applyPremiumLocks) {
+                AccolySubscription.applyPremiumLocks();
+            }
+        })
+        .catch(function (err) {
+            console.error('Profile load error:', err);
+            if (errEl) {
+                errEl.textContent = 'Could not load profile data. Check your connection and refresh the page.';
+                errEl.hidden = false;
+            }
+            if (window.AccountifyUI) {
+                AccountifyUI.toast('Profile data failed to load', 'error');
+            }
+        })
+        .finally(function () {
+            setProfileLoading(false);
+        });
+}
+
+function renderProfileHeader(user, stats, posts) {
+    const initials = (user.fullName || 'U')
+        .split(' ')
+        .map(function (n) { return n[0]; })
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+
     var avatarEl = document.getElementById('profileAvatar');
-    if (avatarEl) avatarEl.textContent = initials;
-    
+    if (avatarEl) avatarEl.textContent = initials || 'U';
+
     var nameEl = document.getElementById('profileName');
     if (nameEl) nameEl.textContent = user.fullName || 'User';
 
     var streakBadge = document.getElementById('profileStreakBadge');
     if (streakBadge) streakBadge.textContent = '🔥 ' + (stats.currentStreak || 0) + 'd';
-    
+
     var emailEl = document.getElementById('profileEmail');
-    if (emailEl) emailEl.textContent = esc(user.email || '');
-    
+    if (emailEl) emailEl.textContent = user.email || '';
+
     var planEl = document.getElementById('profilePlanBadge');
     if (planEl) {
         var isPremium = user.subscriptionStatus === 'premium';
         planEl.textContent = isPremium ? 'Premium' : 'Basic';
-        planEl.style.color = isPremium ? 'var(--primary)' : 'var(--text-secondary)';
-        planEl.style.fontWeight = '700';
+        planEl.classList.toggle('profile-pill--premium', isPremium);
     }
-    var joinedEl = document.getElementById('profileJoinedDate');
-    if (joinedEl) joinedEl.textContent = 'Joined ' + new Date(user.createdAt || Date.now()).toLocaleDateString();
 
-    // Calculate level and progress
+    var joinedEl = document.getElementById('profileJoinedDate');
+    if (joinedEl) {
+        var jd = safeDate(user.createdAt);
+        joinedEl.textContent = jd ? 'Joined ' + jd.toLocaleDateString() : 'Member';
+    }
+
     const levelName = Storage.getLevelName(stats.level);
     const levelEmojis = {
         1: '📚',
@@ -64,11 +125,15 @@ function loadProfile() {
         5: '👑'
     };
 
-    document.getElementById('profileLevel').textContent = `Level: ${levelName}`;
-    document.getElementById('profileCurrentLevel').textContent = levelName;
-    document.getElementById('profileLevelEmoji').textContent = levelEmojis[stats.level] || '📚';
+    var profileLevel = document.getElementById('profileLevel');
+    if (profileLevel) profileLevel.textContent = 'Level: ' + levelName;
 
-    // Calculate progress to next level
+    var profileCurrentLevel = document.getElementById('profileCurrentLevel');
+    if (profileCurrentLevel) profileCurrentLevel.textContent = levelName;
+
+    var profileLevelEmoji = document.getElementById('profileLevelEmoji');
+    if (profileLevelEmoji) profileLevelEmoji.textContent = levelEmojis[stats.level] || '📚';
+
     const levelThresholds = {
         1: 500,
         2: 1500,
@@ -79,19 +144,30 @@ function loadProfile() {
 
     const currentThreshold = levelThresholds[stats.level] || 0;
     const nextThreshold = levelThresholds[stats.level + 1] || 10000;
-    const currentXP = stats.totalXP;
-    const xpInCurrentLevel = currentXP - currentThreshold;
-    const xpNeededForLevel = nextThreshold - currentThreshold;
+    const currentXP = stats.totalXP || 0;
+    const xpInCurrentLevel = Math.max(0, currentXP - currentThreshold);
+    const xpNeededForLevel = Math.max(1, nextThreshold - currentThreshold);
     const progressPercent = Math.min(100, Math.round((xpInCurrentLevel / xpNeededForLevel) * 100));
 
-    document.getElementById('profileProgressPercent').textContent = progressPercent + '%';
-    document.getElementById('profileProgressBar').style.width = progressPercent + '%';
-    document.getElementById('profileXPProgress').textContent = `${xpInCurrentLevel} / ${xpNeededForLevel} XP`;
+    var profileProgressPercent = document.getElementById('profileProgressPercent');
+    if (profileProgressPercent) profileProgressPercent.textContent = progressPercent + '%';
 
-    // Update stats
-    document.getElementById('profileAccuracy').textContent = stats.accuracyPercentage + '%';
-    document.getElementById('profileQuizzes').textContent = stats.totalQuizzes;
-    document.getElementById('profileXP').textContent = stats.totalXP;
+    var profileProgressBar = document.getElementById('profileProgressBar');
+    if (profileProgressBar) profileProgressBar.style.width = progressPercent + '%';
+
+    var profileXPProgress = document.getElementById('profileXPProgress');
+    if (profileXPProgress) {
+        profileXPProgress.textContent = xpInCurrentLevel + ' / ' + xpNeededForLevel + ' XP to next level';
+    }
+
+    var profileAccuracy = document.getElementById('profileAccuracy');
+    if (profileAccuracy) profileAccuracy.textContent = (stats.accuracyPercentage != null ? stats.accuracyPercentage : 0) + '%';
+
+    var profileQuizzes = document.getElementById('profileQuizzes');
+    if (profileQuizzes) profileQuizzes.textContent = String(stats.totalQuizzes != null ? stats.totalQuizzes : 0);
+
+    var profileXP = document.getElementById('profileXP');
+    if (profileXP) profileXP.textContent = String(stats.totalXP != null ? stats.totalXP : 0);
 
     var notesCount = Storage.getPdfMetaList(user.id).length;
     var notepadCount = Storage.getNotepadEntries(user.id).length;
@@ -101,21 +177,64 @@ function loadProfile() {
     if (padEl) padEl.textContent = String(notepadCount);
 
     var likesEl = document.getElementById('profileLikesReceived');
-    if (likesEl) likesEl.textContent = String(calculateLikesReceived(user.id));
-
-    // Load recent quizzes
-    loadRecentQuizzes(user.id);
-    renderStudyChart(user.id);
-    renderStudyCalendar(user.id);
-    renderSubjectRatings(user.id);
+    if (likesEl) likesEl.textContent = String(calculateLikesReceived(user.id, posts));
 }
 
-function renderSubjectRatings(userId) {
+function renderAchievements(stats) {
+    var el = document.getElementById('profileAchievements');
+    if (!el) return;
+
+    var tq = stats.totalQuizzes || 0;
+    var streak = stats.currentStreak || 0;
+    var acc = stats.accuracyPercentage || 0;
+    var level = stats.level || 1;
+
+    var defs = [
+        {
+            icon: '⭐',
+            title: 'Quiz Master',
+            desc: 'Complete 10 quizzes',
+            unlocked: tq >= 10
+        },
+        {
+            icon: '🔥',
+            title: 'Week Warrior',
+            desc: '7-day study streak',
+            unlocked: streak >= 7
+        },
+        {
+            icon: '🎯',
+            title: 'Accuracy Ace',
+            desc: '90%+ average accuracy',
+            unlocked: acc >= 90 && tq >= 3
+        },
+        {
+            icon: '👑',
+            title: 'Rising CPA',
+            desc: 'Reach level 4 or higher',
+            unlocked: level >= 4
+        }
+    ];
+
+    el.innerHTML = defs
+        .map(function (d) {
+            var cls = 'achievement' + (d.unlocked ? ' achievement--unlocked' : ' achievement--locked');
+            return (
+                '<article class="' + cls + '">' +
+                '<div class="achievement-icon">' + d.icon + '</div>' +
+                '<h4>' + esc(d.title) + '</h4>' +
+                '<p>' + esc(d.desc) + '</p>' +
+                '</article>'
+            );
+        })
+        .join('');
+}
+
+function renderSubjectRatingsFromAttempts(attempts) {
     var el = document.getElementById('profileSubjectRatings');
     if (!el) return;
-    var attempts = Storage.getQuizAttempts(userId);
     var map = {};
-    attempts.forEach(function (a) {
+    (attempts || []).forEach(function (a) {
         var s = a.subject || 'General';
         if (!map[s]) map[s] = { sum: 0, n: 0 };
         map[s].sum += typeof a.score === 'number' ? a.score : 0;
@@ -123,32 +242,29 @@ function renderSubjectRatings(userId) {
     });
     var keys = Object.keys(map);
     if (!keys.length) {
-        el.innerHTML = '<p style="color: var(--text-secondary); margin: 0;">Take quizzes to see subject ratings.</p>';
+        el.innerHTML = '<p class="profile-lead" style="margin:0;">Take quizzes to see subject ratings.</p>';
         return;
     }
     keys.sort();
     el.innerHTML =
-        '<div class="card" style="padding:0;">' +
+        '<div class="profile-ratings-list">' +
         keys
             .map(function (s) {
                 var avg = Math.round(map[s].sum / map[s].n);
                 return (
-                    '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 1rem;border-bottom:1px solid var(--border);">' +
-                    '<span>' +
-                    esc(s) +
-                    '</span><strong>' +
-                    avg +
-                    '% avg</strong></div>'
+                    '<div class="profile-ratings-row">' +
+                    '<span>' + esc(s) + '</span>' +
+                    '<strong>' + avg + '% avg</strong>' +
+                    '</div>'
                 );
             })
             .join('') +
         '</div>';
 }
 
-function calculateLikesReceived(userId) {
-    var posts = Storage.getPosts ? Storage.getPosts() : [];
+function calculateLikesReceived(userId, posts) {
     var total = 0;
-    posts.forEach(function (p) {
+    (posts || []).forEach(function (p) {
         if (p.userId !== userId) return;
         if (p.reactions && Array.isArray(p.reactions.like)) total += p.reactions.like.length;
         else if (p.reactions && typeof p.reactions.like === 'number') total += p.reactions.like;
@@ -161,54 +277,64 @@ function calculateLikesReceived(userId) {
     return total;
 }
 
-function loadRecentQuizzes(userId) {
-    const attempts = Storage.getQuizAttempts(userId);
+function loadRecentQuizzesFromAttempts(attempts) {
     const recentContainer = document.getElementById('recentQuizzes');
     if (!recentContainer) return;
 
-    if (attempts.length === 0) {
-        recentContainer.innerHTML = '<p style="color: var(--text-secondary);">No quiz attempts yet. Start taking quizzes to see your history!</p>';
+    if (!attempts || attempts.length === 0) {
+        recentContainer.innerHTML = '<p class="profile-lead" style="margin:0;">No quiz attempts yet. Open Quiz Center to get started.</p>';
         return;
     }
 
-    const recent = attempts.slice(-10).reverse();
-    
-    recentContainer.innerHTML = recent.map(attempt => {
-        const date = new Date(attempt.timestamp);
-        const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        
-        return `
-            <div class="quiz-item">
-                <div class="quiz-item-info">
-                    <h4>${esc(attempt.subject || 'Unknown')}</h4>
-                    <p class="quiz-item-date">${dateStr} • ${esc((attempt.difficulty || 'Unknown').replace('Super Hard', 'Elite'))}</p>
-                </div>
-                <div class="quiz-item-score">
-                    <div class="quiz-item-score-value">${(attempt.score || 0)}%</div>
-                    <div class="quiz-item-score-label">${(attempt.xpEarned || 0)} XP</div>
-                </div>
-            </div>
-        `;
-    }).join('');
+    const recent = attempts.slice().slice(-10).reverse();
+
+    recentContainer.innerHTML = recent
+        .map(function (attempt) {
+            var d = safeDate(attempt.timestamp);
+            var dateStr = d
+                ? d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '—';
+            var diff = (attempt.difficulty || 'Unknown').replace('Super Hard', 'Elite');
+            return (
+                '<div class="quiz-item">' +
+                '<div class="quiz-item-info">' +
+                '<h4>' + esc(attempt.subject || 'Unknown') + '</h4>' +
+                '<p class="quiz-item-date">' + esc(dateStr) + ' • ' + esc(diff) + '</p>' +
+                '</div>' +
+                '<div class="quiz-item-score">' +
+                '<div class="quiz-item-score-value">' + (attempt.score || 0) + '%</div>' +
+                '<div class="quiz-item-score-label">' + (attempt.xpEarned || 0) + ' XP</div>' +
+                '</div>' +
+                '</div>'
+            );
+        })
+        .join('');
 }
 
 function logout() {
-    Storage.logout();
-    window.location.href = 'login.html';
+    if (window.SupabaseClient && SupabaseClient.signOut) {
+        SupabaseClient.signOut().finally(function () {
+            Storage.logout();
+            window.location.href = 'login.html';
+        });
+    } else {
+        Storage.logout();
+        window.location.href = 'login.html';
+    }
 }
 
-function renderStudyChart(userId) {
-    var attempts = Storage.getQuizAttempts(userId).slice().reverse().slice(0, 8);
+function renderStudyChartFromAttempts(attempts) {
+    var list = (attempts || []).slice().reverse().slice(0, 8);
     var canvas = document.getElementById('studyChart');
     if (!canvas || !canvas.getContext) return;
     var ctx = canvas.getContext('2d');
     var w = canvas.width;
     var h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#f1f5f9';
     ctx.fillRect(0, 0, w, h);
 
-    if (!attempts.length) {
+    if (!list.length) {
         ctx.fillStyle = '#64748B';
         ctx.font = '14px sans-serif';
         ctx.fillText('No quiz data yet.', 20, 30);
@@ -224,43 +350,64 @@ function renderStudyChart(userId) {
     ctx.lineTo(pad, h - pad);
     ctx.stroke();
 
-    var step = (w - pad * 2) / Math.max(1, attempts.length - 1);
+    var step = (w - pad * 2) / Math.max(1, list.length - 1);
     ctx.strokeStyle = '#1E3A8A';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    attempts.forEach(function (a, i) {
+    list.forEach(function (a, i) {
+        var score = typeof a.score === 'number' ? a.score : 0;
         var x = pad + i * step;
-        var y = h - pad - (a.score / 100) * (h - pad * 2);
+        var y = h - pad - (score / 100) * (h - pad * 2);
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    list.forEach(function (a, i) {
+        var score = typeof a.score === 'number' ? a.score : 0;
+        var x = pad + i * step;
+        var y = h - pad - (score / 100) * (h - pad * 2);
         ctx.fillStyle = '#3B82F6';
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, Math.PI * 2);
         ctx.fill();
     });
-    ctx.stroke();
 }
 
-function renderStudyCalendar(userId) {
+function renderStudyCalendarFromAttempts(attempts) {
     var cal = document.getElementById('studyCalendar');
     if (!cal) return;
-    var attempts = Storage.getQuizAttempts(userId);
     var byDay = {};
-    attempts.forEach(function (a) {
-        var key = new Date(a.timestamp).toISOString().slice(0, 10);
+    (attempts || []).forEach(function (a) {
+        var d = safeDate(a.timestamp);
+        if (!d) return;
+        var key = d.toISOString().slice(0, 10);
         byDay[key] = (byDay[key] || 0) + 1;
     });
     var days = [];
     for (var i = 13; i >= 0; i--) {
         var d = new Date(Date.now() - i * 86400000);
         var key = d.toISOString().slice(0, 10);
-        days.push({ key: key, day: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), count: byDay[key] || 0 });
+        days.push({
+            key: key,
+            day: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+            count: byDay[key] || 0
+        });
     }
     cal.innerHTML = days
         .map(function (d) {
-            var bg = d.count ? 'rgba(30,58,138,' + Math.min(0.2 + d.count * 0.2, 0.85) + ')' : 'var(--surface)';
+            var bg = d.count ? 'rgba(30,58,138,' + Math.min(0.2 + d.count * 0.2, 0.85) + ')' : 'var(--background)';
             var color = d.count ? '#fff' : 'var(--text-secondary)';
-            return '<span style="display:inline-block;min-width:72px;margin:0.25rem;padding:0.5rem;border-radius:8px;background:' + bg + ';color:' + color + ';text-align:center;font-size:0.8rem;">' + d.day + '<br><strong>' + d.count + '</strong></span>';
+            return (
+                '<span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:68px;margin:0.2rem;padding:0.5rem 0.35rem;border-radius:10px;background:' +
+                bg +
+                ';color:' +
+                color +
+                ';text-align:center;font-size:0.78rem;border:1px solid var(--border);">' +
+                d.day +
+                '<strong style="margin-top:0.25rem;font-size:0.95rem;">' +
+                d.count +
+                '</strong></span>'
+            );
         })
         .join('');
 }

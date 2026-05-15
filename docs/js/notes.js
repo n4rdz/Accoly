@@ -76,11 +76,51 @@ function bindManagerEvents() {
     var sort = document.getElementById('pdfSort');
     var uploadBtn = document.getElementById('btnUploadPdf');
     var uploadInput = document.getElementById('pdfUploadInput');
-    search.addEventListener('input', function () { ManagerState.search = search.value.trim().toLowerCase(); renderPdfLibrary(); });
-    sort.addEventListener('change', function () { ManagerState.sort = sort.value; renderPdfLibrary(); });
+    var dropZone = document.getElementById('pdfDropZone');
+
+    if (search) {
+        search.addEventListener('input', function () {
+            ManagerState.search = search.value.trim().toLowerCase();
+            renderPdfLibrary();
+        });
+    }
+    if (sort) {
+        sort.addEventListener('change', function () {
+            ManagerState.sort = sort.value;
+            renderPdfLibrary();
+        });
+    }
     if (uploadBtn && uploadInput) {
-        uploadBtn.addEventListener('click', function () { uploadInput.value = ''; uploadInput.click(); });
-        uploadInput.addEventListener('change', function () { var f = uploadInput.files && uploadInput.files[0]; if (f) uploadPdf(f); });
+        uploadBtn.addEventListener('click', function () {
+            uploadInput.value = '';
+            uploadInput.click();
+        });
+        uploadInput.addEventListener('change', function () {
+            var f = uploadInput.files && uploadInput.files[0];
+            if (f) uploadPdf(f);
+        });
+    }
+
+    if (dropZone) {
+        ['dragenter', 'dragover'].forEach(function (evName) {
+            dropZone.addEventListener(evName, function (e) {
+                e.preventDefault();
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+                dropZone.classList.add('pdf-drop-zone--active');
+            });
+        });
+        dropZone.addEventListener('dragleave', function (e) {
+            var rel = e.relatedTarget;
+            if (rel && dropZone.contains(rel)) return;
+            dropZone.classList.remove('pdf-drop-zone--active');
+        });
+        dropZone.addEventListener('drop', function (e) {
+            e.preventDefault();
+            dropZone.classList.remove('pdf-drop-zone--active');
+            var dt = e.dataTransfer;
+            if (!dt || !dt.files || !dt.files.length) return;
+            uploadPdf(dt.files[0]);
+        });
     }
 }
 
@@ -132,7 +172,14 @@ function renderPdfLibrary() {
 function renderMetaSection(containerId, items) {
     var el = document.getElementById(containerId);
     if (!el) return;
-    if (!items.length) return (el.innerHTML = '<div class="empty-state"><p>No files</p></div>');
+    if (!items.length) {
+        el.innerHTML =
+            '<div class="empty-state">' +
+            '<p>No PDFs yet.</p>' +
+            '<p style="font-size:0.9rem;color:var(--text-secondary);margin-top:0.35rem;">Use <strong>Upload PDF</strong> or drag a file into the library area.</p>' +
+            '</div>';
+        return;
+    }
     el.innerHTML = items.map(function (m) {
         const id = escAttr(m.id || '');
         const name = esc(m.name || 'Untitled.pdf');

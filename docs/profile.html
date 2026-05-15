@@ -69,7 +69,7 @@
         <main class="dashboard-main">
             <!-- Top Bar -->
             <header class="top-bar">
-                <h2>Profile</h2>
+                <h1 class="module-page-title">Profile</h1>
                 <div class="top-bar-right top-bar-actions">
                     <div class="dropdown-shell dropdown-shell--notif">
                         <button type="button" class="icon-btn nav-notif-btn" id="navNotifBtn" aria-label="Notifications" aria-expanded="false" aria-haspopup="true">🔔</button>
@@ -95,154 +95,152 @@
             </header>
 
             <!-- Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content profile-dashboard">
+                <div id="profileLoadingOverlay" class="profile-loading-overlay" hidden aria-busy="false">
+                    <div class="profile-loading-card" role="status">
+                        <div class="profile-spinner" aria-hidden="true"></div>
+                        <p>Loading your profile…</p>
+                    </div>
+                </div>
+                <div id="profileFetchError" class="profile-fetch-error" role="alert" hidden></div>
+
                 <!-- Profile Header -->
-                <div class="profile-header">
-                    <div class="profile-avatar-large" id="profileAvatar"></div>
-                    <div class="profile-info">
-                        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.35rem;">
-                            <h1 id="profileName" style="margin:0;"></h1>
-                            <span id="profileStreakBadge" style="font-size:0.9rem;font-weight:700;padding:0.2rem 0.55rem;border-radius:999px;background:rgba(234,88,12,0.12);color:#c2410c;border:1px solid rgba(234,88,12,0.35);"></span>
+                <section class="profile-hero card">
+                    <div class="profile-hero__avatar" id="profileAvatar" aria-hidden="true"></div>
+                    <div class="profile-hero__main">
+                        <div class="profile-hero__title-row">
+                            <h2 id="profileName" class="profile-hero__name">—</h2>
+                            <span id="profileStreakBadge" class="profile-pill profile-pill--streak" title="Current study streak">🔥 0d</span>
                         </div>
-                        <p id="profileEmail"></p>
-                        <p id="profilePlanBadge"></p>
-                        <p id="profileJoinedDate"></p>
-                        <p id="profileLevel"></p>
+                        <p id="profileEmail" class="profile-hero__email"></p>
+                        <div class="profile-hero__meta">
+                            <span id="profilePlanBadge" class="profile-pill profile-pill--plan">Basic</span>
+                            <span id="profileJoinedDate" class="profile-hero__joined"></span>
+                        </div>
+                        <p id="profileLevel" class="profile-hero__level"></p>
                     </div>
-                </div>
+                </section>
 
-                <div class="profile-section" id="profileSubjectRatingsSection">
-                    <h2>Subject ratings</h2>
-                    <p style="color:var(--text-secondary);font-size:0.9rem;margin-top:0;">Average quiz score by subject (from your attempts).</p>
-                    <div id="profileSubjectRatings" style="margin-top:0.75rem;"></div>
-                </div>
+                <div class="profile-layout">
+                    <div class="profile-layout__main">
+                        <section class="profile-section card profile-section--flush" id="profileSubjectRatingsSection">
+                            <h2>Subject ratings</h2>
+                            <p class="profile-lead">Average quiz score by subject from your attempts.</p>
+                            <div id="profileSubjectRatings" class="profile-ratings-host"></div>
+                        </section>
 
-                <div class="profile-section">
-                    <h2>Learning</h2>
-                    <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">📈</div>
-                        <div class="stat-info">
-                            <p class="stat-label">Accuracy</p>
-                            <p class="stat-value" id="profileAccuracy">0%</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">🎓</div>
-                        <div class="stat-info">
-                            <p class="stat-label">Quizzes</p>
-                            <p class="stat-value" id="profileQuizzes">0</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">⭐</div>
-                        <div class="stat-info">
-                            <p class="stat-label">Total XP</p>
-                            <p class="stat-value" id="profileXP">0</p>
-                        </div>
-                    </div>
-                    </div>
-                </div>
-
-                <div class="profile-section">
-                    <h2>Library</h2>
-                    <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">📝</div>
-                        <div class="stat-info">
-                            <p class="stat-label">PDFs / notes</p>
-                            <p class="stat-value" id="profileNotesCount">0</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">✏️</div>
-                        <div class="stat-info">
-                            <p class="stat-label">Notepad pages</p>
-                            <p class="stat-value" id="profileNotepadCount">0</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">👍</div>
-                        <div class="stat-info">
-                            <p class="stat-label">Likes received</p>
-                            <p class="stat-value" id="profileLikesReceived">0</p>
-                        </div>
-                    </div>
-                    </div>
-                </div>
-
-                <!-- Level Progression -->
-                <div class="profile-section">
-                    <h2>Level Progression</h2>
-                    <div class="level-card">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <div>
-                                <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">Current Level</p>
-                                <p style="font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0 0 0;" id="profileCurrentLevel">-</p>
+                        <section class="profile-section card profile-section--flush">
+                            <h2>Learning overview</h2>
+                            <p class="profile-lead">Performance metrics synced from quiz activity.</p>
+                            <div class="profile-bento">
+                                <div class="profile-bento__item">
+                                    <span class="profile-bento__icon" aria-hidden="true">📈</span>
+                                    <div>
+                                        <p class="profile-bento__label">Accuracy</p>
+                                        <p class="profile-bento__value" id="profileAccuracy">0%</p>
+                                    </div>
+                                </div>
+                                <div class="profile-bento__item">
+                                    <span class="profile-bento__icon" aria-hidden="true">🎓</span>
+                                    <div>
+                                        <p class="profile-bento__label">Quizzes</p>
+                                        <p class="profile-bento__value" id="profileQuizzes">0</p>
+                                    </div>
+                                </div>
+                                <div class="profile-bento__item">
+                                    <span class="profile-bento__icon" aria-hidden="true">⭐</span>
+                                    <div>
+                                        <p class="profile-bento__label">Total XP</p>
+                                        <p class="profile-bento__value" id="profileXP">0</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div style="font-size: 3rem;" id="profileLevelEmoji">📚</div>
-                        </div>
-                        
-                        <div style="margin-bottom: 1rem;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                <span style="color: var(--text-secondary); font-size: 0.9rem;">Progress to Next Level</span>
-                                <span style="font-weight: 600;" id="profileProgressPercent">0%</span>
+                        </section>
+
+                        <section class="profile-section card profile-section--flush">
+                            <h2>Library</h2>
+                            <p class="profile-lead">Local workspace counts (PDFs, notepad).</p>
+                            <div class="profile-bento profile-bento--three">
+                                <div class="profile-bento__item">
+                                    <span class="profile-bento__icon" aria-hidden="true">📝</span>
+                                    <div>
+                                        <p class="profile-bento__label">PDFs</p>
+                                        <p class="profile-bento__value" id="profileNotesCount">0</p>
+                                    </div>
+                                </div>
+                                <div class="profile-bento__item">
+                                    <span class="profile-bento__icon" aria-hidden="true">✏️</span>
+                                    <div>
+                                        <p class="profile-bento__label">Notepad</p>
+                                        <p class="profile-bento__value" id="profileNotepadCount">0</p>
+                                    </div>
+                                </div>
+                                <div class="profile-bento__item">
+                                    <span class="profile-bento__icon" aria-hidden="true">👍</span>
+                                    <div>
+                                        <p class="profile-bento__label">Reactions</p>
+                                        <p class="profile-bento__value" id="profileLikesReceived">0</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div style="width: 100%; height: 12px; background: var(--surface); border-radius: 6px; overflow: hidden;">
-                                <div id="profileProgressBar" style="height: 100%; background: linear-gradient(to right, var(--primary), var(--primary-light)); width: 0%; transition: width 0.3s ease;"></div>
+                        </section>
+
+                        <section class="profile-section card profile-section--flush">
+                            <h2>Level progression</h2>
+                            <div class="level-card level-card--modern">
+                                <div class="level-card__header">
+                                    <div>
+                                        <p class="profile-bento__label">Current level</p>
+                                        <p class="level-card__title" id="profileCurrentLevel">—</p>
+                                    </div>
+                                    <div class="level-card__emoji" id="profileLevelEmoji" aria-hidden="true">📚</div>
+                                </div>
+                                <div class="level-card__progress-block">
+                                    <div class="level-card__progress-labels">
+                                        <span>Progress to next level</span>
+                                        <span id="profileProgressPercent">0%</span>
+                                    </div>
+                                    <div class="level-card__track">
+                                        <div id="profileProgressBar" class="level-card__fill"></div>
+                                    </div>
+                                </div>
+                                <p class="level-card__xp" id="profileXPProgress">0 / 0 XP</p>
                             </div>
-                        </div>
+                        </section>
 
-                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;" id="profileXPProgress">0 / 0 XP</p>
-                    </div>
-                </div>
+                        <section class="profile-section card profile-section--flush">
+                            <h2>Achievements</h2>
+                            <p class="profile-lead">Badges unlock from your synced stats.</p>
+                            <div id="profileAchievements" class="achievements-grid"></div>
+                        </section>
 
-                <!-- Achievements -->
-                <div class="profile-section">
-                    <h2>Achievements</h2>
-                    <div class="achievements-grid">
-                        <div class="achievement">
-                            <div class="achievement-icon">⭐</div>
-                            <h4>Quiz Master</h4>
-                            <p>Complete 10 quizzes</p>
-                        </div>
-                        <div class="achievement">
-                            <div class="achievement-icon">🔥</div>
-                            <h4>Perfect Streak</h4>
-                            <p>7-day study streak</p>
-                        </div>
-                        <div class="achievement">
-                            <div class="achievement-icon">🎯</div>
-                            <h4>Accuracy Champ</h4>
-                            <p>90%+ average accuracy</p>
-                        </div>
-                        <div class="achievement">
-                            <div class="achievement-icon">👑</div>
-                            <h4>Top Performer</h4>
-                            <p>Rank in top 10</p>
-                        </div>
-                    </div>
-                </div>
+                        <section class="profile-section card profile-section--flush">
+                            <h2>Recent quiz attempts</h2>
+                            <div id="recentQuizzes" class="profile-quiz-list"></div>
+                        </section>
 
-                <!-- Recent Quizzes -->
-                <div class="profile-section">
-                    <h2>Recent Quiz Attempts</h2>
-                    <div id="recentQuizzes" style="display: flex; flex-direction: column; gap: 1rem;"></div>
-                </div>
-                <div class="profile-section">
-                    <h2>Study Habits</h2>
-                    <canvas id="studyChart" width="700" height="220" style="width:100%;max-width:100%;background:var(--background);border:1px solid var(--border);border-radius:var(--radius-lg);"></canvas>
-                </div>
-                <div class="profile-section">
-                    <h2>Study Calendar</h2>
-                    <div id="studyCalendar" class="card"></div>
-                </div>
-                <div class="profile-section">
-                    <h2>Premium</h2>
-                    <div class="card">
-                        <p style="margin-bottom:0.75rem;">Upgrade to unlock advanced analytics, offline quizzes, and more.</p>
-                        <button type="button" class="btn btn-primary" id="profileUpgradeBtn">Upgrade to Premium</button>
-                        <button type="button" class="btn btn-outline" id="profileAdvancedAnalyticsBtn" data-premium="true" style="margin-left:0.5rem;">Advanced analytics</button>
+                        <section class="profile-section card profile-section--flush">
+                            <h2>Score trend</h2>
+                            <p class="profile-lead">Last 8 quizzes (newest on the right).</p>
+                            <div class="profile-chart-wrap">
+                                <canvas id="studyChart" width="700" height="220" class="profile-chart"></canvas>
+                            </div>
+                        </section>
+
+                        <section class="profile-section card profile-section--flush">
+                            <h2>Study calendar</h2>
+                            <p class="profile-lead">Quizzes completed per day (last 14 days).</p>
+                            <div id="studyCalendar" class="study-calendar profile-calendar"></div>
+                        </section>
+
+                        <section class="profile-section card profile-section--flush profile-premium-cta">
+                            <h2>Premium</h2>
+                            <p class="profile-lead">Unlock offline quizzes, deeper analytics, and more.</p>
+                            <div class="profile-premium-actions">
+                                <button type="button" class="btn btn-primary" id="profileUpgradeBtn">Upgrade to Premium</button>
+                                <button type="button" class="btn btn-outline" id="profileAdvancedAnalyticsBtn" data-premium="true">Advanced analytics</button>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -256,6 +254,7 @@
     <script src="js/nav-header.js"></script>
     <script src="js/subscription.js"></script>
     <script src="js/offline.js"></script>
+    <script src="js/ui.js"></script>
     <script src="js/profile.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
