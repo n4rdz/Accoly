@@ -519,7 +519,10 @@ function renderSavedList() {
             var list = (entries || []).filter(function (e) {
                 return normalizeCode(e.subject) === normalizedSub;
             }).sort(function (a, b) {
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                // FIX: Handle both camelCase and snake_case from Supabase
+                var timeA = new Date(a.createdAt || a.created_at).getTime();
+                var timeB = new Date(b.createdAt || b.created_at).getTime();
+                return timeB - timeA;
             });
 
             if (list.length === 0) {
@@ -549,7 +552,9 @@ function appendSavedListItem(container, entry) {
         img.alt = 'Saved drawing';
 
         var small = document.createElement('small');
-        small.textContent = new Date(entry.createdAt).toLocaleString();
+        // FIX: Handle both camelCase and snake_case from Supabase
+        var dateStr = entry.createdAt || entry.created_at;
+        small.textContent = new Date(dateStr).toLocaleString();
 
         var row = document.createElement('div');
         row.style.display = 'flex';
