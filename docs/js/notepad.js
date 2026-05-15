@@ -204,7 +204,7 @@ function populateNotepadSubjectSelect() {
     if (window.AccolyStats) {
         subSel.innerHTML = AccolyStats.getSubjectOptions()
             .map(function (o) {
-                return '<option value="' + o.code + '">' + o.label + '</option>';
+                return '<option value="' + o.value + '">' + o.label + '</option>';
             })
             .join('');
     } else {
@@ -492,7 +492,8 @@ function exportPng() {
 
 function renderSavedList() {
     var user = Storage.getCurrentUser();
-    var sub = NP.currentSubject || 'FAR';
+    if (!NP.currentSubject) { var _sel = document.getElementById('notepadSubjectSelect'); NP.currentSubject = (_sel && _sel.value) || 'FAR'; }
+    var sub = NP.currentSubject;
     var container = document.getElementById('savedList');
     if (!container || !user) return;
 
@@ -505,16 +506,17 @@ function renderSavedList() {
 
     SupabaseClient.getNotepadEntries(user.id)
         .then(function (entries) {
-            var list = (entries || []).filter(function (e) {
-                var entryCode;
+            var normalizeCode = function (code) {
                 try {
-                    entryCode = window.AccolyStats && typeof AccolyStats.normalizeSubjectCode === 'function'
-                        ? AccolyStats.normalizeSubjectCode(e.subject)
-                        : (e.subject || 'FAR');
-                } catch (_) {
-                    entryCode = e.subject || 'FAR';
-                }
-                return entryCode === sub;
+                    if (window.AccolyStats && typeof AccolyStats.normalizeSubjectCode === 'function') {
+                        return AccolyStats.normalizeSubjectCode(code);
+                    }
+                } catch (_) {}
+                return (code || 'FAR').toUpperCase().trim();
+            };
+            var normalizedSub = normalizeCode(sub);
+            var list = (entries || []).filter(function (e) {
+                return normalizeCode(e.subject) === normalizedSub;
             }).sort(function (a, b) {
                 return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
             });
@@ -529,7 +531,8 @@ function renderSavedList() {
                 appendSavedListItem(container, entry);
             });
         })
-        .catch(function () {
+        .catch(function (err) {
+            console.error('[Notepad] getNotepadEntries failed:', err);
             container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
         });
 }
