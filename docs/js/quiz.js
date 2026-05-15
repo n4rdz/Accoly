@@ -317,6 +317,9 @@ function submitQuiz() {
             if (!saved) {
                 console.error('Failed to persist quiz attempt');
             }
+            return SupabaseClient.syncUserStatsFromAttempts(user.id);
+        })
+        .then(function () {
             return SupabaseClient.addNotification({
                 userId: user.id,
                 message: 'You completed the ' + currentQuizModule.name + ' quiz! Score: ' + score + '%'

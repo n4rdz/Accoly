@@ -136,6 +136,14 @@ function openPostModal(postId) {
             anonChk.checked = false;
             var pr = window.AccolySubscription && AccolySubscription.isPremiumUser();
             anonRow.style.display = pr ? 'block' : 'none';
+            if (!anonChk.dataset.bound) {
+                anonChk.dataset.bound = '1';
+                anonChk.addEventListener('change', function () {
+                    if (anonChk.checked && !checkPremiumAccess('Anonymous posting')) {
+                        anonChk.checked = false;
+                    }
+                });
+            }
         }
     }
 
@@ -200,6 +208,7 @@ function saveFromPostModal() {
             content: content,
             type: type,
             tags: tags,
+            isAnonymous: wantAnon,
             reactions: { like: [], love: [], laugh: [], helpful: [], dislike: [] },
             comments: []
         };

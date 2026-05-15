@@ -21,10 +21,6 @@
                     <span class="nav-icon">📊</span>
                     <span>Dashboard</span>
                 </a>
-                <a href="notes.html" class="nav-item">
-                    <span class="nav-icon">📄</span>
-                    <span>PDF</span>
-                </a>
                 <a href="community.html" class="nav-item">
                     <span class="nav-icon">🧑‍🤝‍🧑</span>
                     <span>Community</span>
@@ -105,7 +101,7 @@
 
                 <section class="card" style="margin-bottom: 2rem;">
                     <h3 style="margin-bottom:0.35rem;">Unlock Premium</h3>
-                    <p style="margin-bottom:0.75rem;">Get offline quizzes, unlimited flashcards, anonymous posting, and more.</p>
+                    <p style="margin-bottom:0.75rem;">Group chat, anonymous community posts, and quiz answer explanations.</p>
                     <button type="button" class="btn btn-primary" id="dashUpgradeBtn">Upgrade to Premium</button>
                 </section>
 
@@ -140,18 +136,25 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">📝</div>
+                        <div class="stat-icon">⭐</div>
                         <div class="stat-info">
-                            <p class="stat-label">Notes Created</p>
-                            <p class="stat-value" id="dashNotesCount">0</p>
+                            <p class="stat-label">Total XP</p>
+                            <p class="stat-value" id="dashTotalXP">0</p>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">✏️</div>
+                        <div class="stat-icon">🧠</div>
                         <div class="stat-info">
-                            <p class="stat-label">Notepad Pages</p>
-                            <p class="stat-value" id="dashNotepadCount">0</p>
+                            <p class="stat-label">Flashcards</p>
+                            <p class="stat-value" id="dashFlashcardCount">0</p>
                         </div>
+                    </div>
+                </section>
+
+                <section class="recent-activity" style="margin-bottom: 2rem;">
+                    <h2>Subject analytics</h2>
+                    <div id="dashSubjectBreakdown" class="activity-list">
+                        <p style="color: var(--text-secondary);">Loading…</p>
                     </div>
                 </section>
 
@@ -164,10 +167,10 @@
                             <h3>Take a Quiz</h3>
                             <p>Practice accounting with interactive quizzes</p>
                         </a>
-                        <a href="notes.html" class="quick-link-card">
-                            <div class="quick-icon">📝</div>
-                            <h3>Create Notes</h3>
-                            <p>Organize your study materials</p>
+                        <a href="flashcards.html" class="quick-link-card">
+                            <div class="quick-icon">🧠</div>
+                            <h3>Study Flashcards</h3>
+                            <p>Review key accounting concepts</p>
                         </a>
                         <a href="leaderboard.html" class="quick-link-card">
                             <div class="quick-icon">🏆</div>
@@ -191,6 +194,7 @@
     <script src="js/supabase-client.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/stats-utils.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/nav-header.js"></script>
     <script src="js/subscription.js"></script>

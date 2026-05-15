@@ -46,11 +46,9 @@
             '<div class="upgrade-modal-body">' +
             '<p id="upgradeModalMessage">This feature requires Premium.</p>' +
             '<div class="upgrade-modal-benefits">' +
-            '<div class="upgrade-pill">Unlimited flashcards</div>' +
-            '<div class="upgrade-pill">Offline quizzes</div>' +
-            '<div class="upgrade-pill">Detailed quiz explanations</div>' +
-            '<div class="upgrade-pill">Group chat</div>' +
-            '<div class="upgrade-pill">Anonymous posting</div>' +
+            '<div class="upgrade-pill">Create group chats (Messages)</div>' +
+            '<div class="upgrade-pill">Post anonymously (Community)</div>' +
+            '<div class="upgrade-pill">Quiz answers with explanations</div>' +
             '</div>' +
             '</div>' +
             '<div class="upgrade-modal-footer">' +

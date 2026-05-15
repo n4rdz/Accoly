@@ -52,13 +52,20 @@ function loadProfile() {
     Promise.all([
         SupabaseClient.getUserStats(user.id),
         SupabaseClient.getQuizAttempts(user.id),
-        SupabaseClient.getPosts()
+        SupabaseClient.getPosts(),
+        SupabaseClient.getLibraryFiles(user.id),
+        SupabaseClient.getFlashcards(user.id)
     ])
         .then(function (results) {
-            const stats = results[0];
+            const dbStats = results[0];
             const attempts = results[1];
             const posts = results[2];
-            renderProfileHeader(user, stats, posts);
+            const libraryFiles = results[3] || [];
+            const flashcards = results[4] || [];
+            const derived = AccolyStats.buildUserStatsFromAttempts(attempts);
+            const stats = AccolyStats.mergeStats(dbStats, derived);
+            renderProfileHeader(user, stats, posts, libraryFiles, flashcards);
+            renderLevelTiers(stats);
             renderAchievements(stats);
             renderSubjectRatingsFromAttempts(attempts);
             loadRecentQuizzesFromAttempts(attempts);
@@ -83,7 +90,26 @@ function loadProfile() {
         });
 }
 
-function renderProfileHeader(user, stats, posts) {
+function renderLevelTiers(stats) {
+    var el = document.getElementById('profileLevelTiers');
+    if (!el || !window.AccolyStats) return;
+    var totalXP = stats.totalXP || 0;
+    var currentLevel = stats.level || Storage.calculateLevel(totalXP);
+    el.innerHTML = AccolyStats.LEVEL_TIERS.map(function (tier) {
+        var unlocked = currentLevel >= tier.level;
+        var cls = 'profile-level-tier' + (unlocked ? ' profile-level-tier--unlocked' : '');
+        return (
+            '<div class="' + cls + '">' +
+            '<span class="profile-level-tier__emoji">' + tier.emoji + '</span>' +
+            '<div><strong>Level ' + tier.level + ': ' + esc(tier.name) + '</strong>' +
+            '<p style="margin:0.15rem 0 0;font-size:0.85rem;color:var(--text-secondary);">' +
+            tier.xpRequired + '+ XP</p></div>' +
+            '</div>'
+        );
+    }).join('');
+}
+
+function renderProfileHeader(user, stats, posts, libraryFiles, flashcards) {
     const initials = (user.fullName || 'U')
         .split(' ')
         .map(function (n) { return n[0]; })
@@ -134,20 +160,11 @@ function renderProfileHeader(user, stats, posts) {
     var profileLevelEmoji = document.getElementById('profileLevelEmoji');
     if (profileLevelEmoji) profileLevelEmoji.textContent = levelEmojis[stats.level] || '📚';
 
-    const levelThresholds = {
-        1: 500,
-        2: 1500,
-        3: 3500,
-        4: 7000,
-        5: 10000
-    };
-
-    const currentThreshold = levelThresholds[stats.level] || 0;
-    const nextThreshold = levelThresholds[stats.level + 1] || 10000;
     const currentXP = stats.totalXP || 0;
-    const xpInCurrentLevel = Math.max(0, currentXP - currentThreshold);
-    const xpNeededForLevel = Math.max(1, nextThreshold - currentThreshold);
-    const progressPercent = Math.min(100, Math.round((xpInCurrentLevel / xpNeededForLevel) * 100));
+    const progress = AccolyStats.getLevelProgress(currentXP, stats.level);
+    const xpInCurrentLevel = progress.xpInLevel;
+    const xpNeededForLevel = progress.xpNeeded;
+    const progressPercent = progress.percent;
 
     var profileProgressPercent = document.getElementById('profileProgressPercent');
     if (profileProgressPercent) profileProgressPercent.textContent = progressPercent + '%';
@@ -169,12 +186,10 @@ function renderProfileHeader(user, stats, posts) {
     var profileXP = document.getElementById('profileXP');
     if (profileXP) profileXP.textContent = String(stats.totalXP != null ? stats.totalXP : 0);
 
-    var notesCount = Storage.getPdfMetaList(user.id).length;
-    var notepadCount = Storage.getNotepadEntries(user.id).length;
-    var notesEl = document.getElementById('profileNotesCount');
-    var padEl = document.getElementById('profileNotepadCount');
-    if (notesEl) notesEl.textContent = String(notesCount);
-    if (padEl) padEl.textContent = String(notepadCount);
+    var libraryEl = document.getElementById('profileLibraryCount');
+    var flashEl = document.getElementById('profileFlashcardCount');
+    if (libraryEl) libraryEl.textContent = String((libraryFiles || []).length);
+    if (flashEl) flashEl.textContent = String((flashcards || []).length);
 
     var likesEl = document.getElementById('profileLikesReceived');
     if (likesEl) likesEl.textContent = String(calculateLikesReceived(user.id, posts));

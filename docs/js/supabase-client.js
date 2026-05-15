@@ -131,7 +131,7 @@ const SupabaseClient = {
     // ── Quiz attempts ────────────────────────────────────────────────────────
 
     saveQuizAttempt: async function (attempt) {
-        const { data, error } = await _sb.from('quiz_attempts').insert({
+        const row = {
             user_id: attempt.userId,
             subject: attempt.subject || '',
             difficulty: attempt.difficulty || '',
@@ -140,7 +140,9 @@ const SupabaseClient = {
             total_questions: attempt.totalQuestions || 0,
             xp_earned: attempt.xpEarned || 0,
             created_at: new Date().toISOString()
-        }).select().single();
+        };
+        if (attempt.timeTaken != null) row.time_taken = attempt.timeTaken;
+        const { data, error } = await _sb.from('quiz_attempts').insert(row).select().single();
         if (error || !data) return null;
         return data;
     },
@@ -149,8 +151,26 @@ const SupabaseClient = {
         const { data, error } = await _sb.from('quiz_attempts').select('*').eq('user_id', userId).order('created_at', { ascending: false });
         if (error || !data) return [];
         return data.map(function (a) {
-            return { id: a.id, userId: a.user_id, subject: a.subject, difficulty: a.difficulty, score: a.score, correctAnswers: a.correct_answers, totalQuestions: a.total_questions, xpEarned: a.xp_earned, timestamp: a.created_at };
+            return {
+                id: a.id,
+                userId: a.user_id,
+                subject: a.subject,
+                difficulty: a.difficulty,
+                score: a.score,
+                correctAnswers: a.correct_answers,
+                totalQuestions: a.total_questions,
+                xpEarned: a.xp_earned,
+                timeTaken: a.time_taken || a.time_spent || 0,
+                timestamp: a.created_at
+            };
         });
+    },
+
+    syncUserStatsFromAttempts: async function (userId) {
+        const attempts = await SupabaseClient.getQuizAttempts(userId);
+        if (!window.AccolyStats) return false;
+        const stats = AccolyStats.buildUserStatsFromAttempts(attempts);
+        return SupabaseClient.saveUserStats(userId, stats);
     },
 
     // ── User stats ───────────────────────────────────────────────────────────
@@ -158,20 +178,30 @@ const SupabaseClient = {
     getUserStats: async function (userId) {
         const { data, error } = await _sb.from('user_stats').select('*').eq('user_id', userId).single();
         if (error || !data) return { totalQuizzes: 0, totalXP: 0, accuracyPercentage: 0, currentStreak: 0, bestScore: 0, level: 1, lastAttemptDate: null };
-        return { totalQuizzes: data.total_quizzes, totalXP: data.total_xp, accuracyPercentage: data.accuracy_percentage, currentStreak: data.current_streak, bestScore: data.best_score, level: data.level, lastAttemptDate: data.last_attempt_date };
+        return {
+            totalQuizzes: data.total_quizzes || 0,
+            totalXP: data.total_xp || 0,
+            accuracyPercentage: data.accuracy_percentage != null ? data.accuracy_percentage : (data.average_accuracy || 0),
+            currentStreak: data.current_streak || 0,
+            bestScore: data.best_score || 0,
+            level: data.level || Storage.calculateLevel(data.total_xp || 0),
+            lastAttemptDate: data.last_attempt_date || null
+        };
     },
 
     saveUserStats: async function (userId, stats) {
-        const { error } = await _sb.from('user_stats').upsert({
+        const row = {
             user_id: userId,
             total_quizzes: stats.totalQuizzes,
             total_xp: stats.totalXP,
             accuracy_percentage: stats.accuracyPercentage,
+            average_accuracy: stats.accuracyPercentage,
             current_streak: stats.currentStreak,
             best_score: stats.bestScore,
             level: stats.level,
             last_attempt_date: stats.lastAttemptDate
-        });
+        };
+        const { error } = await _sb.from('user_stats').upsert(row);
         return !error;
     },
 
@@ -194,6 +224,24 @@ const SupabaseClient = {
         });
     },
 
+    getLibraryFiles: async function (userId) {
+        const { data, error } = await _sb.from('library_files').select('*').eq('user_id', userId).order('uploaded_at', { ascending: false });
+        if (error || !data) return [];
+        return data.map(function (f) {
+            return {
+                id: f.id,
+                userId: f.user_id,
+                fileName: f.file_name,
+                fileUrl: f.file_url,
+                fileSize: f.file_size,
+                fileType: f.file_type,
+                category: f.category,
+                description: f.description,
+                uploadedAt: f.uploaded_at
+            };
+        });
+    },
+
     savePost: async function (post) {
         const row = {
             user_id: post.userId, user_name: post.userName, content: post.content,
@@ -201,6 +249,7 @@ const SupabaseClient = {
             reactions: post.reactions || { like: [], love: [], laugh: [], helpful: [], dislike: [] },
             comments: post.comments || [], updated_at: new Date().toISOString()
         };
+        if (post.isAnonymous) row.is_anonymous = true;
         if (post.id) row.id = post.id;
         const { data, error } = await _sb.from('posts').upsert(row).select().single();
         if (error || !data) return null;

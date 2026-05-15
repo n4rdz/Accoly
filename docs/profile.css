@@ -513,3 +513,30 @@
         font-size: 2rem;
     }
 }
+
+.profile-level-tiers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.profile-level-tier {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    opacity: 0.65;
+}
+
+.profile-level-tier--unlocked {
+    opacity: 1;
+    border-color: rgba(59, 130, 246, 0.35);
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.profile-level-tier__emoji {
+    font-size: 1.35rem;
+}

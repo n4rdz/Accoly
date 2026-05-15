@@ -22,10 +22,6 @@
                     <span class="nav-icon">📊</span>
                     <span>Dashboard</span>
                 </a>
-                <a href="notes.html" class="nav-item">
-                    <span class="nav-icon">📄</span>
-                    <span>PDF</span>
-                </a>
                 <a href="community.html" class="nav-item">
                     <span class="nav-icon">🧑‍🤝‍🧑</span>
                     <span>Community</span>
@@ -115,15 +111,11 @@
                     </div>
                 </div>
 
-                <!-- Filter -->
+                <!-- Subject filter -->
                 <div class="leaderboard-filter">
-                    <h3>Time Period</h3>
-                    <div class="filter-buttons">
-                        <button onclick="filterLeaderboard('all_time')" class="filter-btn active">All Time</button>
-                        <button onclick="filterLeaderboard('monthly')" class="filter-btn">Monthly</button>
-                        <button onclick="filterLeaderboard('weekly')" class="filter-btn">Weekly</button>
-                        <button onclick="filterLeaderboard('daily')" class="filter-btn">Daily</button>
-                    </div>
+                    <h3>Subject</h3>
+                    <p id="leaderboardFilterLabel" style="margin:0 0 0.75rem;color:var(--text-secondary);font-size:0.9rem;">All-time · all subjects</p>
+                    <div class="filter-buttons" id="subjectFilterButtons"></div>
                 </div>
 
                 <!-- Leaderboard Table -->
@@ -168,6 +160,7 @@
     <script src="js/supabase-client.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/stats-utils.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/nav-header.js"></script>
     <script src="js/subscription.js"></script>
