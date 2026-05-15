@@ -236,6 +236,10 @@
     gap: 0.75rem;
 }
 
+.profile-bento--two {
+    grid-template-columns: repeat(2, 1fr);
+}
+
 .profile-bento--three {
     grid-template-columns: repeat(3, 1fr);
 }

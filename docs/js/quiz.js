@@ -54,7 +54,7 @@ function loadQuizModules() {
         <div class="quiz-module">
             <div class="quiz-module-header" style="background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);">
                 <div class="quiz-module-title">
-                    <h3>${esc(module.name)}</h3>
+                    <h3>${esc(window.AccolyStats ? AccolyStats.getSubjectLabel(module.subject) : module.name)}</h3>
                     <p>10 Questions • ${esc(module.difficulty)}</p>
                 </div>
                 <div class="difficulty-badge">${esc(module.difficulty)}</div>

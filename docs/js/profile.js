@@ -177,9 +177,6 @@ function renderProfileHeader(user, stats, posts, libraryFiles, flashcards) {
         profileXPProgress.textContent = xpInCurrentLevel + ' / ' + xpNeededForLevel + ' XP to next level';
     }
 
-    var profileAccuracy = document.getElementById('profileAccuracy');
-    if (profileAccuracy) profileAccuracy.textContent = (stats.accuracyPercentage != null ? stats.accuracyPercentage : 0) + '%';
-
     var profileQuizzes = document.getElementById('profileQuizzes');
     if (profileQuizzes) profileQuizzes.textContent = String(stats.totalQuizzes != null ? stats.totalQuizzes : 0);
 
@@ -191,8 +188,6 @@ function renderProfileHeader(user, stats, posts, libraryFiles, flashcards) {
     if (libraryEl) libraryEl.textContent = String((libraryFiles || []).length);
     if (flashEl) flashEl.textContent = String((flashcards || []).length);
 
-    var likesEl = document.getElementById('profileLikesReceived');
-    if (likesEl) likesEl.textContent = String(calculateLikesReceived(user.id, posts));
 }
 
 function renderAchievements(stats) {
@@ -250,7 +245,9 @@ function renderSubjectRatingsFromAttempts(attempts) {
     if (!el) return;
     var map = {};
     (attempts || []).forEach(function (a) {
-        var s = a.subject || 'General';
+                var s = window.AccolyStats
+                    ? AccolyStats.getSubjectLabel(AccolyStats.normalizeSubjectCode(a.subject))
+                    : a.subject || 'General';
         if (!map[s]) map[s] = { sum: 0, n: 0 };
         map[s].sum += typeof a.score === 'number' ? a.score : 0;
         map[s].n += 1;
@@ -268,7 +265,13 @@ function renderSubjectRatingsFromAttempts(attempts) {
                 var avg = Math.round(map[s].sum / map[s].n);
                 return (
                     '<div class="profile-ratings-row">' +
-                    '<span>' + esc(s) + '</span>' +
+                    '<span>' +
+                    esc(
+                        window.AccolyStats
+                            ? AccolyStats.getSubjectLabel(AccolyStats.normalizeSubjectCode(s))
+                            : s
+                    ) +
+                    '</span>' +
                     '<strong>' + avg + '% avg</strong>' +
                     '</div>'
                 );

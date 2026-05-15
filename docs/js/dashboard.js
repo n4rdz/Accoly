@@ -103,7 +103,9 @@ function renderSubjectBreakdown(attempts) {
     if (!host) return;
     var map = {};
     (attempts || []).forEach(function (a) {
-        var s = a.subject || 'General';
+        var s = window.AccolyStats
+            ? AccolyStats.getSubjectLabel(AccolyStats.normalizeSubjectCode(a.subject))
+            : a.subject || 'General';
         if (!map[s]) map[s] = { pts: 0, n: 0, acc: 0 };
         map[s].pts += a.xpEarned || 0;
         map[s].acc += AccolyStats.computeAttemptAccuracy(a);

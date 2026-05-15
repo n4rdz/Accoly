@@ -73,9 +73,14 @@
                                 <h3 style="margin:0;" id="chatTitle">Select a conversation</h3>
                                 <p style="margin:0;" id="chatSubtitle"></p>
                             </div>
-                            <button type="button" class="btn btn-outline" id="btnPremiumGroup" title="Premium">
-                                🔒 Create group
-                            </button>
+                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                                <button type="button" class="btn btn-outline" id="btnPremiumGroup" title="Premium">
+                                    🔒 Create group
+                                </button>
+                                <button type="button" class="btn btn-outline" id="btnAddGroupMember" title="Premium" style="display:none;">
+                                    Add member
+                                </button>
+                            </div>
                         </div>
 
                         <div class="card" id="groupsPremiumPanel" style="margin-bottom:0.75rem;">
@@ -100,12 +105,56 @@
     <script src="js/supabase-client.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/stats-utils.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/nav-header.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/subscription.js"></script>
     <script src="js/offline.js"></script>
     <script src="js/messages.js"></script>
+
+    <div id="groupCreateModal" class="modal-overlay" role="dialog" aria-modal="true" hidden>
+        <div class="modal-panel card" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>Create study group</h3>
+                <button type="button" class="modal-close" id="groupCreateClose" aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="groupCreateName">Group name</label>
+                    <input id="groupCreateName" type="text" class="form-input" placeholder="e.g. FAR review squad" />
+                </div>
+                <div class="form-group">
+                    <label for="groupCreateSubject">Subject</label>
+                    <select id="groupCreateSubject" class="form-select sort-select" style="width:100%;"></select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="groupCreateCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="groupCreateSave">Create group</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="groupMemberModal" class="modal-overlay" role="dialog" aria-modal="true" hidden>
+        <div class="modal-panel card" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>Add member to group</h3>
+                <button type="button" class="modal-close" id="groupMemberClose" aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="groupMemberPicker">Student</label>
+                    <select id="groupMemberPicker" class="form-select sort-select" style="width:100%;"></select>
+                </div>
+                <p id="groupMemberHint" style="font-size:0.85rem;color:var(--text-secondary);margin:0;"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="groupMemberCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="groupMemberSave">Add member</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 

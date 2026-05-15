@@ -2,14 +2,7 @@
 // STANDARDS LIBRARY
 // ============================================
 
-var STD_SUBJECTS = [
-    'Financial Accounting',
-    'Cost Accounting',
-    'Auditing',
-    'Taxation',
-    'Business Law',
-    'General'
-];
+var STD_SUBJECTS = ['FAR', 'AFAR', 'MS', 'AUD', 'RFBT', 'TAX', 'General'];
 
 var stdState = {
     filterSubject: 'all',

@@ -123,6 +123,7 @@ function openChat(otherUserId) {
     var other = MSG_ALL_USERS.find(function (u) { return u.id === otherUserId; });
     document.getElementById('chatTitle').textContent = other ? other.fullName : 'Conversation';
     document.getElementById('chatSubtitle').textContent = other && other.subscriptionStatus === 'premium' ? 'Premium student' : 'Basic student';
+    updateGroupActionButtons(null, Storage.getCurrentUser());
     MSG_CONVO_CACHE = [];
     renderChat();
     renderConversationList();
@@ -137,10 +138,24 @@ function openGroup(groupId) {
     MSG.activeUserId = null;
     var groups = Storage.getGroups();
     var g = groups.find(function (x) { return x.id === groupId; });
+    var me = Storage.getCurrentUser();
+    var subjectLabel = g && g.subject && window.AccolyStats
+        ? AccolyStats.getSubjectLabel(AccolyStats.normalizeSubjectCode(g.subject))
+        : (g && g.subject) || 'General';
     document.getElementById('chatTitle').textContent = g ? g.name : 'Group chat';
-    document.getElementById('chatSubtitle').textContent = g && g.subject ? 'Subject: ' + g.subject : 'Group';
+    document.getElementById('chatSubtitle').textContent =
+        (g && g.subject ? subjectLabel : 'Group') +
+        (g && Array.isArray(g.memberIds) ? ' · ' + g.memberIds.length + ' members' : '');
+    updateGroupActionButtons(g, me);
     renderChat();
     renderGroupList();
+}
+
+function updateGroupActionButtons(group, me) {
+    var addBtn = document.getElementById('btnAddGroupMember');
+    if (!addBtn) return;
+    var show = !!(msgPremium() && group && MSG.activeGroupId && group.createdBy === me.id);
+    addBtn.style.display = show ? 'inline-block' : 'none';
 }
 
 function renderChat() {
@@ -219,7 +234,11 @@ function renderGroupList() {
     listEl.innerHTML = groups.map(function (g) {
         return '<button type="button" class="conv-item ' + (MSG.activeGroupId === g.id ? 'active' : '') + '" data-gid="' + g.id + '">' +
             '<div style="font-weight:800;color:var(--text-primary);">' + esc(g.name) + '</div>' +
-            '<div style="font-size:0.85rem;color:var(--text-secondary);">' + esc(g.subject || 'General') + '</div>' +
+            '<div style="font-size:0.85rem;color:var(--text-secondary);">' + esc(
+                g.subject && window.AccolyStats
+                    ? AccolyStats.getSubjectLabel(AccolyStats.normalizeSubjectCode(g.subject))
+                    : g.subject || 'General'
+            ) + '</div>' +
             '</button>';
     }).join('');
     listEl.querySelectorAll('[data-gid]').forEach(function (btn) {
@@ -300,23 +319,162 @@ function sendMessage() {
 
 function bindPremiumLocks() {
     var btn = document.getElementById('btnPremiumGroup');
-    if (!btn) return;
-    btn.setAttribute('data-premium', 'true');
-    btn.addEventListener('click', function () {
+    if (btn) {
+        btn.setAttribute('data-premium', 'true');
+        btn.addEventListener('click', function () {
+            if (!checkPremiumAccess('Group chat creation')) return;
+            openGroupCreateModal();
+        });
+    }
+    var addBtn = document.getElementById('btnAddGroupMember');
+    if (addBtn) {
+        addBtn.setAttribute('data-premium', 'true');
+        addBtn.addEventListener('click', function () {
+            if (!checkPremiumAccess('Add group members')) return;
+            openGroupMemberModal();
+        });
+    }
+    bindGroupModals();
+    if (window.AccolySubscription && AccolySubscription.applyPremiumLocks) {
+        AccolySubscription.applyPremiumLocks();
+    }
+}
+
+function bindGroupModals() {
+    var createModal = document.getElementById('groupCreateModal');
+    var memberModal = document.getElementById('groupMemberModal');
+    if (!createModal || !memberModal) return;
+
+    populateGroupSubjectSelect();
+
+    function closeCreate() {
+        createModal.hidden = true;
+        createModal.classList.remove('open');
+    }
+    function closeMember() {
+        memberModal.hidden = true;
+        memberModal.classList.remove('open');
+    }
+
+    document.getElementById('groupCreateClose').addEventListener('click', closeCreate);
+    document.getElementById('groupCreateCancel').addEventListener('click', closeCreate);
+    document.getElementById('groupMemberClose').addEventListener('click', closeMember);
+    document.getElementById('groupMemberCancel').addEventListener('click', closeMember);
+
+    createModal.addEventListener('click', function (e) {
+        if (e.target === createModal) closeCreate();
+    });
+    memberModal.addEventListener('click', function (e) {
+        if (e.target === memberModal) closeMember();
+    });
+
+    document.getElementById('groupCreateSave').addEventListener('click', function () {
         if (!checkPremiumAccess('Group chat creation')) return;
-        createGroupFlow();
+        var me = Storage.getCurrentUser();
+        var name = (document.getElementById('groupCreateName').value || '').trim();
+        var subject = document.getElementById('groupCreateSubject').value || 'FAR';
+        if (!name) {
+            AccountifyUI.toast('Enter a group name', 'warning');
+            return;
+        }
+        var g = Storage.saveGroup({
+            name: name,
+            subject: subject,
+            createdBy: me.id,
+            memberIds: [me.id]
+        });
+        closeCreate();
+        AccountifyUI.toast('Group created', 'success');
+        renderGroupList();
+        openGroup(g.id);
+    });
+
+    document.getElementById('groupMemberSave').addEventListener('click', function () {
+        if (!checkPremiumAccess('Add group members')) return;
+        var picker = document.getElementById('groupMemberPicker');
+        var userId = picker.value;
+        if (!userId) {
+            AccountifyUI.toast('Select a student to add', 'warning');
+            return;
+        }
+        if (!MSG.activeGroupId) {
+            AccountifyUI.toast('Open a group first', 'warning');
+            return;
+        }
+        var groups = Storage.getGroups();
+        var g = groups.find(function (x) { return x.id === MSG.activeGroupId; });
+        if (!g) return;
+        if (g.memberIds && g.memberIds.indexOf(userId) !== -1) {
+            AccountifyUI.toast('Already in this group', 'warning');
+            return;
+        }
+        Storage.addMemberToGroup(MSG.activeGroupId, userId);
+        SupabaseClient.addNotification({
+            userId: userId,
+            message: 'You were added to group "' + (g.name || 'Study group') + '"'
+        }).catch(function () {});
+        closeMember();
+        AccountifyUI.toast('Member added', 'success');
+        openGroup(MSG.activeGroupId);
+        if (window.AccountifyNav) AccountifyNav.refreshNotifications().catch(function () {});
     });
 }
 
-function createGroupFlow() {
+function populateGroupSubjectSelect() {
+    var sel = document.getElementById('groupCreateSubject');
+    if (!sel || !window.AccolyStats) return;
+    sel.innerHTML = AccolyStats.getSubjectOptions()
+        .map(function (o) {
+            return '<option value="' + o.code + '">' + esc(o.label) + '</option>';
+        })
+        .join('');
+}
+
+function openGroupCreateModal() {
+    var modal = document.getElementById('groupCreateModal');
+    if (!modal) return;
+    document.getElementById('groupCreateName').value = '';
+    populateGroupSubjectSelect();
+    modal.hidden = false;
+    modal.classList.add('open');
+}
+
+function openGroupMemberModal() {
+    var modal = document.getElementById('groupMemberModal');
+    var picker = document.getElementById('groupMemberPicker');
+    var hint = document.getElementById('groupMemberHint');
+    if (!modal || !picker) return;
     var me = Storage.getCurrentUser();
-    var name = window.prompt('Group name');
-    if (!name) return;
-    var subject = window.prompt('Subject (optional)', 'Financial Accounting') || '';
-    var g = Storage.saveGroup({ name: name.trim(), subject: subject.trim(), createdBy: me.id, memberIds: [me.id] });
-    AccountifyUI.toast('Group created', 'success');
-    renderGroupList();
-    openGroup(g.id);
+    var g = Storage.getGroups().find(function (x) { return x.id === MSG.activeGroupId; });
+    if (!g) {
+        AccountifyUI.toast('Select a group first', 'warning');
+        return;
+    }
+    if (g.createdBy !== me.id) {
+        AccountifyUI.toast('Only the group creator can add members', 'warning');
+        return;
+    }
+    var members = g.memberIds || [];
+    var candidates = allUsersExceptMe().filter(function (u) {
+        return members.indexOf(u.id) === -1;
+    });
+    picker.innerHTML = '<option value="">Select student...</option>';
+    if (!candidates.length) {
+        picker.innerHTML += '<option value="" disabled>No students available to add</option>';
+    }
+    candidates.forEach(function (u) {
+        var o = document.createElement('option');
+        o.value = u.id;
+        o.textContent = u.fullName;
+        picker.appendChild(o);
+    });
+    if (hint) {
+        hint.textContent = candidates.length
+            ? 'Adding to: ' + (g.name || 'Group')
+            : 'Everyone available is already in this group.';
+    }
+    modal.hidden = false;
+    modal.classList.add('open');
 }
 
 function displayName(userId) {

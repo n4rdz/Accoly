@@ -1,15 +1,21 @@
-// Shared quiz stats: points, accuracy (score + time), levels, streaks
+// Shared quiz stats: subjects, points, accuracy, levels, filters
 (function () {
-    var QUIZ_SUBJECTS = [
-        'All Subjects',
-        'Financial Accounting',
-        'Cost Accounting',
-        'Auditing',
-        'Taxation',
-        'Business Law',
-        'Economics',
-        'MAS'
+    var SUBJECT_CATALOG = [
+        { code: 'FAR', label: 'Financial Accounting and Reporting', legacy: ['Financial Accounting'] },
+        { code: 'AFAR', label: 'Advanced Financial Accounting and Reporting', legacy: ['Cost Accounting'] },
+        { code: 'MS', label: 'Management Services', legacy: ['MAS', 'Management Advisory Services', 'Management Services'] },
+        { code: 'AUD', label: 'Auditing', legacy: ['Auditing'] },
+        { code: 'RFBT', label: 'Regulatory Framework and Business Transactions', legacy: ['Business Law', 'Economics'] },
+        { code: 'TAX', label: 'Taxation', legacy: ['Taxation'] }
     ];
+
+    var QUIZ_SUBJECTS = ['All Subjects'].concat(
+        SUBJECT_CATALOG.map(function (s) {
+            return s.code;
+        })
+    );
+
+    var QUIZ_DIFFICULTIES = ['All Difficulties', 'Easy', 'Medium', 'Hard', 'Elite'];
 
     var LEVEL_TIERS = [
         { level: 1, name: 'Beginner Accountant', xpRequired: 0, emoji: '📚' },
@@ -18,6 +24,47 @@
         { level: 4, name: 'Audit Specialist', xpRequired: 3500, emoji: '✓' },
         { level: 5, name: 'CPA Elite', xpRequired: 7000, emoji: '👑' }
     ];
+
+    function normalizeSubjectCode(subject) {
+        if (!subject) return '';
+        var s = String(subject).trim();
+        var byCode = SUBJECT_CATALOG.find(function (c) {
+            return c.code === s;
+        });
+        if (byCode) return byCode.code;
+        var byLabel = SUBJECT_CATALOG.find(function (c) {
+            return c.label === s;
+        });
+        if (byLabel) return byLabel.code;
+        var i;
+        for (i = 0; i < SUBJECT_CATALOG.length; i++) {
+            var leg = SUBJECT_CATALOG[i].legacy || [];
+            if (leg.indexOf(s) !== -1) return SUBJECT_CATALOG[i].code;
+        }
+        return s;
+    }
+
+    function getSubjectLabel(code) {
+        if (!code || code === 'All Subjects') return 'All Subjects';
+        var item = SUBJECT_CATALOG.find(function (c) {
+            return c.code === code;
+        });
+        return item ? item.code + ' — ' + item.label : code;
+    }
+
+    function getSubjectOptions() {
+        return SUBJECT_CATALOG.map(function (c) {
+            return { code: c.code, label: getSubjectLabel(c.code) };
+        });
+    }
+
+    function normalizeDifficulty(difficulty) {
+        if (!difficulty) return '';
+        var d = String(difficulty).trim();
+        if (d === 'Super Hard') return 'Elite';
+        if (d === 'Intermediate') return 'Medium';
+        return d;
+    }
 
     function computeAttemptAccuracy(attempt) {
         var score = typeof attempt.score === 'number' ? attempt.score : 0;
@@ -35,8 +82,22 @@
     function filterAttemptsBySubject(attempts, subjectFilter) {
         if (!subjectFilter || subjectFilter === 'All Subjects') return attempts || [];
         return (attempts || []).filter(function (a) {
-            return (a.subject || '') === subjectFilter;
+            return normalizeSubjectCode(a.subject) === subjectFilter;
         });
+    }
+
+    function filterAttemptsByDifficulty(attempts, difficultyFilter) {
+        if (!difficultyFilter || difficultyFilter === 'All Difficulties') return attempts || [];
+        return (attempts || []).filter(function (a) {
+            return normalizeDifficulty(a.difficulty) === difficultyFilter;
+        });
+    }
+
+    function filterAttempts(attempts, subjectFilter, difficultyFilter) {
+        return filterAttemptsByDifficulty(
+            filterAttemptsBySubject(attempts, subjectFilter),
+            difficultyFilter
+        );
     }
 
     function computeTotalPoints(attempts) {
@@ -144,10 +205,18 @@
     }
 
     window.AccolyStats = {
+        SUBJECT_CATALOG: SUBJECT_CATALOG,
         QUIZ_SUBJECTS: QUIZ_SUBJECTS,
+        QUIZ_DIFFICULTIES: QUIZ_DIFFICULTIES,
         LEVEL_TIERS: LEVEL_TIERS,
+        normalizeSubjectCode: normalizeSubjectCode,
+        getSubjectLabel: getSubjectLabel,
+        getSubjectOptions: getSubjectOptions,
+        normalizeDifficulty: normalizeDifficulty,
         computeAttemptAccuracy: computeAttemptAccuracy,
         filterAttemptsBySubject: filterAttemptsBySubject,
+        filterAttemptsByDifficulty: filterAttemptsByDifficulty,
+        filterAttempts: filterAttempts,
         computeTotalPoints: computeTotalPoints,
         aggregateAccuracy: aggregateAccuracy,
         computeStudyStreak: computeStudyStreak,
