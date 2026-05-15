@@ -493,143 +493,165 @@ function exportPng() {
 
 function renderSavedList() {
     var user = Storage.getCurrentUser();
-    if (!NP.currentSubject) { var _sel = document.getElementById('notepadSubjectSelect'); NP.currentSubject = (_sel && _sel.value) || 'FAR'; }
+    if (!NP.currentSubject) { 
+        var _sel = document.getElementById('notepadSubjectSelect'); 
+        NP.currentSubject = (_sel && _sel.value) || 'AUD'; 
+    }
     var sub = NP.currentSubject;
     var container = document.getElementById('savedList');
     if (!container || !user) return;
 
     container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Loading...</p>';
 
-    if (!window.SupabaseClient || !SupabaseClient.getNotepadEntries) {
-        container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
+    // Check if Supabase client is available
+    if (!window.SupabaseClient) {
+        console.error('[Notepad] SupabaseClient not available');
+        container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Service unavailable.</p>';
         return;
     }
 
-    SupabaseClient.getNotepadEntries(user.id)
-        .then(function (entries) {
-            var normalizeCode = function (code) {
-                try {
-                    if (window.AccolyStats && typeof AccolyStats.normalizeSubjectCode === 'function') {
-                        return AccolyStats.normalizeSubjectCode(code);
-                    }
-                } catch (_) {}
-                return (code || 'FAR').toUpperCase().trim();
-            };
-            var normalizedSub = normalizeCode(sub);
-            var list = (entries || []).filter(function (e) {
-                return normalizeCode(e.subject) === normalizedSub;
-            }).sort(function (a, b) {
-                // FIX: Handle both camelCase and snake_case from Supabase
-                var timeA = new Date(a.createdAt || a.created_at).getTime();
-                var timeB = new Date(b.createdAt || b.created_at).getTime();
-                return timeB - timeA;
-            });
+    // Try to fetch from Supabase directly
+    try {
+        var supabase = window.supabase;
+        if (!supabase || !supabase.from) {
+            container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Database error.</p>';
+            return;
+        }
 
-            if (list.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet.</p>';
-                return;
-            }
+        supabase
+            .from('notepad_canvases')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .then(function (result) {
+                var entries = result.data || [];
+                
+                if (result.error) {
+                    console.error('[Notepad] Query error:', result.error);
+                    container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Failed to load. Check console.</p>';
+                    return;
+                }
 
-            container.innerHTML = '';
-            list.forEach(function (entry) {
-                appendSavedListItem(container, entry);
+                var normalizeCode = function (code) {
+                    try {
+                        if (window.AccolyStats && typeof AccolyStats.normalizeSubjectCode === 'function') {
+                            return AccolyStats.normalizeSubjectCode(code);
+                        }
+                    } catch (_) {}
+                    return (code || 'AUD').toUpperCase().trim();
+                };
+
+                var normalizedSub = normalizeCode(sub);
+                var list = (entries || []).filter(function (e) {
+                    return normalizeCode(e.subject) === normalizedSub;
+                }).sort(function (a, b) {
+                    var timeA = new Date(a.createdAt || a.created_at).getTime();
+                    var timeB = new Date(b.createdAt || b.created_at).getTime();
+                    return timeB - timeA;
+                });
+
+                if (list.length === 0) {
+                    container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet.</p>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                list.forEach(function (entry) {
+                    appendSavedListItem(container, entry);
+                });
+            })
+            .catch(function (err) {
+                console.error('[Notepad] Error loading canvases:', err);
+                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Error: ' + (err.message || 'Unknown error') + '</p>';
             });
-        })
-        .catch(function (err) {
-            console.error('[Notepad] getNotepadEntries failed:', err);
-            container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
-        });
+    } catch (err) {
+        console.error('[Notepad] Exception:', err);
+        container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Exception: ' + err.message + '</p>';
+    }
 }
 
 function appendSavedListItem(container, entry) {
-        var div = document.createElement('div');
-        div.className = 'saved-item' + (entry.id === NP.currentEntryId ? ' active' : '');
-        div.dataset.id = entry.id;
+    var div = document.createElement('div');
+    div.className = 'saved-item' + (entry.id === NP.currentEntryId ? ' active' : '');
+    div.dataset.id = entry.id;
 
-        var img = document.createElement('img');
-        img.className = 'saved-thumb';
-        img.src = entry.previewDataUrl || entry.imageData;
-        img.alt = 'Saved drawing';
+    var img = document.createElement('img');
+    img.className = 'saved-thumb';
+    img.src = entry.previewDataUrl || entry.imageData || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60"><rect fill="%23f0f0f0" width="100" height="60"/></svg>';
+    img.alt = 'Saved drawing';
 
-        var small = document.createElement('small');
-        // FIX: Handle both camelCase and snake_case from Supabase
-        var dateStr = entry.createdAt || entry.created_at;
-        small.textContent = new Date(dateStr).toLocaleString();
+    var small = document.createElement('small');
+    var dateStr = entry.createdAt || entry.created_at;
+    small.textContent = new Date(dateStr).toLocaleString();
 
-        var row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.gap = '0.35rem';
-        row.style.marginTop = '0.35rem';
+    var row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '0.35rem';
+    row.style.marginTop = '0.35rem';
 
-        var loadBtn = document.createElement('button');
-        loadBtn.type = 'button';
-        loadBtn.className = 'btn btn-outline';
-        loadBtn.style.flex = '1';
-        loadBtn.style.padding = '0.25rem';
-        loadBtn.style.fontSize = '0.75rem';
-        loadBtn.textContent = 'Load';
+    var loadBtn = document.createElement('button');
+    loadBtn.type = 'button';
+    loadBtn.className = 'btn btn-outline';
+    loadBtn.style.flex = '1';
+    loadBtn.style.padding = '0.25rem';
+    loadBtn.style.fontSize = '0.75rem';
+    loadBtn.textContent = 'Load';
 
-        var delBtn = document.createElement('button');
-        delBtn.type = 'button';
-        delBtn.className = 'btn btn-outline';
-        delBtn.style.padding = '0.25rem';
-        delBtn.style.fontSize = '0.75rem';
-        delBtn.textContent = 'Del';
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn-outline';
+    delBtn.style.padding = '0.25rem';
+    delBtn.style.fontSize = '0.75rem';
+    delBtn.textContent = 'Del';
 
-        loadBtn.addEventListener('click', function (ev) {
-            ev.stopPropagation();
-            loadEntry(entry);
-        });
+    loadBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        loadEntry(entry);
+    });
 
-        delBtn.addEventListener('click', function (ev) {
-            ev.stopPropagation();
-            AccountifyUI.confirmDelete('Delete this saved page?').then(function (ok) {
-                if (!ok) return;
-                SupabaseClient.deleteNotepadEntry(entry.id).then(function () {
+    delBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (confirm('Delete this saved page?')) {
+            window.supabase
+                .from('notepad_canvases')
+                .delete()
+                .eq('id', entry.id)
+                .then(function () {
                     if (NP.currentEntryId === entry.id) NP.currentEntryId = null;
-                    AccountifyUI.toast('Page deleted', 'success');
                     renderSavedList();
                 });
-            });
-        });
+        }
+    });
 
-        div.appendChild(img);
-        div.appendChild(small);
-        row.appendChild(loadBtn);
-        row.appendChild(delBtn);
-        div.appendChild(row);
+    div.appendChild(img);
+    div.appendChild(small);
+    row.appendChild(loadBtn);
+    row.appendChild(delBtn);
+    div.appendChild(row);
 
-        div.addEventListener('click', function () {
-            loadEntry(entry);
-        });
+    div.addEventListener('click', function () {
+        loadEntry(entry);
+    });
 
-        container.appendChild(div);
+    container.appendChild(div);
 }
 
 function loadEntry(entry) {
+    if (!entry || !entry.imageData) {
+        console.error('Invalid entry:', entry);
+        return;
+    }
+    
     var img = new Image();
     img.onload = function () {
-        NP.bgType = entry.bgType || 'white';
-        var bgSel = document.getElementById('bgSelect');
-        if (bgSel) bgSel.value = NP.bgType;
-        var sub = document.getElementById('notepadSubjectSelect');
-        var entryCode = window.AccolyStats
-            ? AccolyStats.normalizeSubjectCode(entry.subject)
-            : entry.subject || 'FAR';
-        if (sub) sub.value = entryCode;
-        NP.currentSubject = entryCode;
-        drawBackground(NP.bgType);
-
         NP.ctx.clearRect(0, 0, NP.canvas.width, NP.canvas.height);
-        NP.ctx.drawImage(img, 0, 0, NP.canvas.width, NP.canvas.height);
+        NP.ctx.drawImage(img, 0, 0);
         NP.currentEntryId = entry.id;
+        NP.currentSubject = entry.subject;
         resetHistoryWithCurrent();
-        document.querySelectorAll('.saved-item').forEach(function (el) {
-            el.classList.toggle('active', el.dataset.id === entry.id);
-        });
-        AccountifyUI.toast('Loaded saved page', 'success');
+        renderSavedList();
     };
-    img.src = entry.drawDataUrl || entry.imageData;
+    img.src = entry.imageData;
 }
 
 function logout() {
