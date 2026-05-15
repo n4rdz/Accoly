@@ -35,8 +35,7 @@ function initSubjectFilter() {
     var container = document.getElementById('subjectFilterButtons');
     if (!container || !window.AccolyStats) return;
     container.innerHTML = AccolyStats.QUIZ_SUBJECTS.map(function (code) {
-        var label = code === 'All Subjects' ? code : code;
-        var title = AccolyStats.getSubjectLabel(code);
+        var label = code === 'All Subjects' ? code : AccolyStats.getSubjectLabel(code);
         return buildFilterButton('', 'data-subject', code, label, code === currentSubjectFilter);
     }).join('');
     container.querySelectorAll('[data-subject]').forEach(function (btn) {
@@ -226,6 +225,8 @@ function renderLeaderboardTable(sorted) {
 }
 
 function logout() {
-    Storage.logout();
-    window.location.href = 'login.html';
+    SupabaseClient.signOut().finally(function () {
+        Storage.logout();
+        window.location.replace('login.html');
+    });
 }

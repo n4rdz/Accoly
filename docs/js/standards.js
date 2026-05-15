@@ -2,11 +2,16 @@
 // STANDARDS LIBRARY
 // ============================================
 
-var STD_SUBJECTS = ['FAR', 'AFAR', 'MS', 'AUD', 'RFBT', 'TAX', 'General'];
+var STD_SUBJECTS = ['FAR', 'AFAR', 'MS', 'AUD', 'RFBT', 'TAX'];
+
+function stdSubjectLabel(code) {
+    return window.AccolyStats ? AccolyStats.getSubjectLabel(code) : code;
+}
 
 var stdState = {
     filterSubject: 'all',
-    search: ''
+    search: '',
+    resources: []
 };
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -25,7 +30,19 @@ function initStandards() {
     initSubjectSelect();
     initUploadUi(user);
     bindEvents();
-    renderStandards();
+    loadStandardsFromServer();
+}
+
+function loadStandardsFromServer() {
+    SupabaseClient.getStandards()
+        .then(function (list) {
+            stdState.resources = list || [];
+            renderStandards();
+        })
+        .catch(function () {
+            stdState.resources = [];
+            renderStandards();
+        });
 }
 
 function initFilters() {
@@ -43,6 +60,7 @@ function initFilters() {
         btn.className = 'filter-btn';
         btn.dataset.subject = subj;
         btn.textContent = subj;
+        btn.title = stdSubjectLabel(subj);
         container.appendChild(btn);
     });
 
@@ -62,7 +80,7 @@ function initSubjectSelect() {
     STD_SUBJECTS.forEach(function (subj) {
         var opt = document.createElement('option');
         opt.value = subj;
-        opt.textContent = subj;
+        opt.textContent = stdSubjectLabel(subj);
         sel.appendChild(opt);
     });
 }
@@ -146,7 +164,7 @@ function closeStdModal() {
 }
 
 function getSortedStandards() {
-    var list = Storage.getStandards().slice();
+    var list = (stdState.resources || []).slice();
     list.sort(function (a, b) {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
@@ -156,7 +174,10 @@ function getSortedStandards() {
 function filterStandards(list) {
     if (stdState.filterSubject !== 'all') {
         list = list.filter(function (r) {
-            return r.subject === stdState.filterSubject;
+            var code = window.AccolyStats
+                ? AccolyStats.normalizeSubjectCode(r.subject)
+                : r.subject;
+            return code === stdState.filterSubject;
         });
     }
     if (stdState.search) {
@@ -207,7 +228,14 @@ function renderStandards() {
             escapeHtml(type) +
             '</span>' +
             '<span style="font-size:0.8rem;color:var(--text-secondary);">' +
-            escapeHtml(r.subject || '') +
+            escapeHtml(
+                (function () {
+                    var code = window.AccolyStats
+                        ? AccolyStats.normalizeSubjectCode(r.subject)
+                        : r.subject || '';
+                    return code ? stdSubjectLabel(code) : 'Uncategorized';
+                })()
+            ) +
             '</span>' +
             '<h4>' + escapeHtml(r.title || 'Untitled') + '</h4>' +
             '<p class="standard-card-meta">Added ' +
@@ -259,9 +287,10 @@ function renderStandards() {
             del.addEventListener('click', function () {
                 AccountifyUI.confirmDelete('Remove this resource from the library?').then(function (ok) {
                     if (!ok) return;
-                    Storage.deleteStandard(r.id);
-                    AccountifyUI.toast('Resource removed', 'success');
-                    renderStandards();
+                    SupabaseClient.deleteStandard(r.id).then(function () {
+                        loadStandardsFromServer();
+                        AccountifyUI.toast('Resource removed', 'success');
+                    });
                 });
             });
             actions.appendChild(del);
@@ -327,18 +356,19 @@ function submitStandardAuthorized(user) {
             AccountifyUI.toast('Please choose a PDF file.', 'warning');
             return;
         }
-        if (file.size > 900 * 1024) {
-            AccountifyUI.toast('File too large for local storage (max ~900KB).', 'error');
+        if (file.size > 5 * 1024 * 1024) {
+            AccountifyUI.toast('File too large (max 5MB).', 'error');
             return;
         }
         var reader = new FileReader();
         reader.onload = function () {
             payload.fileName = file.name || 'document.pdf';
             payload.fileData = reader.result;
-            Storage.saveStandardResource(payload);
-            AccountifyUI.toast('Resource published', 'success');
-            closeStdModal();
-            renderStandards();
+            SupabaseClient.saveStandardResource(payload).then(function () {
+                AccountifyUI.toast('Resource published', 'success');
+                closeStdModal();
+                loadStandardsFromServer();
+            });
         };
         reader.onerror = function () {
             AccountifyUI.toast('Could not read file.', 'error');
@@ -352,13 +382,16 @@ function submitStandardAuthorized(user) {
         }
     }
 
-    Storage.saveStandardResource(payload);
-    AccountifyUI.toast('Resource published', 'success');
-    closeStdModal();
-    renderStandards();
+    SupabaseClient.saveStandardResource(payload).then(function () {
+        AccountifyUI.toast('Resource published', 'success');
+        closeStdModal();
+        loadStandardsFromServer();
+    });
 }
 
 function logout() {
-    Storage.logout();
-    window.location.href = 'login.html';
+    SupabaseClient.signOut().finally(function () {
+        Storage.logout();
+        window.location.replace('login.html');
+    });
 }

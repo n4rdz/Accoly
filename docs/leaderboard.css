@@ -76,8 +76,17 @@
     margin-bottom: 1rem;
 }
 
+.filter-buttons .filter-btn {
+    font-size: 0.8rem;
+    line-height: 1.25;
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
+}
+
 .filter-buttons {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     flex-wrap: wrap;
 }

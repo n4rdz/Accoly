@@ -18,24 +18,30 @@ var NP = {
     historyStep: -1,
     maxHistory: 28,
     currentEntryId: null,
-    currentSubject: 'General'
+    currentSubject: 'FAR'
 };
+
+var _notepadInitialized = false;
 
 document.addEventListener('DOMContentLoaded', function () {
     if (window.__authReady) {
         initNotepad();
     } else {
-        window.addEventListener('authReady', initNotepad);
+        window.addEventListener('authReady', initNotepad, { once: true });
     }
 });
 
 function initNotepad() {
+    if (_notepadInitialized) return;
     var user = Storage.getCurrentUser();
-    if (!user) return; // auth.js already redirected
+    if (!user) return;
 
     NP.canvas = document.getElementById('drawingCanvas');
-    NP.ctx = NP.canvas.getContext('2d');
     NP.bgCanvas = document.getElementById('bgCanvas');
+    if (!NP.canvas || !NP.bgCanvas) return;
+
+    _notepadInitialized = true;
+    NP.ctx = NP.canvas.getContext('2d');
     NP.bgCtx = NP.bgCanvas.getContext('2d');
 
     initCanvasSurface();
@@ -192,12 +198,33 @@ function bindToolbars() {
     document.getElementById('btnExportPng').addEventListener('click', exportPng);
 }
 
+function populateNotepadSubjectSelect() {
+    var subSel = document.getElementById('notepadSubjectSelect');
+    if (!subSel) return;
+    if (window.AccolyStats) {
+        subSel.innerHTML = AccolyStats.getSubjectOptions()
+            .map(function (o) {
+                return '<option value="' + o.code + '">' + o.label + '</option>';
+            })
+            .join('');
+    } else {
+        subSel.innerHTML =
+            '<option value="FAR">FAR</option><option value="AFAR">AFAR</option>' +
+            '<option value="MS">MS</option><option value="AUD">AUD</option>' +
+            '<option value="RFBT">RFBT</option><option value="TAX">TAX</option>';
+    }
+    if (!subSel.querySelector('option[value="' + NP.currentSubject + '"]')) {
+        NP.currentSubject = 'FAR';
+    }
+    subSel.value = NP.currentSubject || 'FAR';
+}
+
 function bindNotepadExtras() {
+    populateNotepadSubjectSelect();
     var subSel = document.getElementById('notepadSubjectSelect');
     if (subSel) {
-        subSel.value = NP.currentSubject || 'General';
         subSel.addEventListener('change', function () {
-            NP.currentSubject = subSel.value || 'General';
+            NP.currentSubject = subSel.value || 'FAR';
             NP.currentEntryId = null;
             document.querySelectorAll('.saved-item').forEach(function (el) {
                 el.classList.remove('active');
@@ -415,24 +442,25 @@ function saveDrawing() {
             previewDataUrl: imageData,
             drawDataUrl: drawDataUrl,
             bgType: NP.bgType,
-            subject: NP.currentSubject || 'General'
+            subject: NP.currentSubject || 'FAR'
         };
         
-        if (NP.currentEntryId) {
-            payload.id = NP.currentEntryId;
-            var existing = Storage.getNotepadEntries(user.id).find(function (x) {
-                return x.id === NP.currentEntryId;
+        if (NP.currentEntryId) payload.id = NP.currentEntryId;
+
+        SupabaseClient.saveNotepadEntry(payload)
+            .then(function (saved) {
+                if (!saved) {
+                    AccountifyUI.toast('Failed to save drawing', 'error');
+                    return;
+                }
+                NP.currentEntryId = saved.id;
+                AccountifyUI.toast('Drawing saved successfully', 'success');
+                renderSavedList();
+            })
+            .catch(function (error) {
+                console.error('Save drawing error:', error);
+                AccountifyUI.toast('Failed to save drawing', 'error');
             });
-            if (existing) {
-            payload.createdAt = existing.createdAt;
-            if (!payload.subject && existing.subject) payload.subject = existing.subject;
-        }
-        }
-        
-        var saved = Storage.saveNotepadEntry(payload);
-        NP.currentEntryId = saved.id;
-        AccountifyUI.toast('Drawing saved successfully', 'success');
-        renderSavedList();
     } catch (error) {
         console.error('Save drawing error:', error);
         AccountifyUI.toast('Failed to save drawing', 'error');
@@ -464,21 +492,44 @@ function exportPng() {
 
 function renderSavedList() {
     var user = Storage.getCurrentUser();
-    var sub = NP.currentSubject || 'General';
-    var list = Storage.getNotepadEntries(user.id).filter(function (e) {
-        return (e.subject || 'General') === sub;
-    }).slice().sort(function (a, b) {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-
+    var sub = NP.currentSubject || 'FAR';
     var container = document.getElementById('savedList');
-    if (list.length === 0) {
-        container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet.</p>';
+    if (!container || !user) return;
+
+    container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Loading...</p>';
+
+    if (!window.SupabaseClient || !SupabaseClient.getNotepadEntries) {
+        container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
         return;
     }
 
-    container.innerHTML = '';
-    list.forEach(function (entry) {
+    SupabaseClient.getNotepadEntries(user.id)
+        .then(function (entries) {
+            var list = (entries || []).filter(function (e) {
+                var entryCode = window.AccolyStats
+                    ? AccolyStats.normalizeSubjectCode(e.subject)
+                    : e.subject || 'FAR';
+                return entryCode === sub;
+            }).sort(function (a, b) {
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            });
+
+            if (list.length === 0) {
+                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            list.forEach(function (entry) {
+                appendSavedListItem(container, entry);
+            });
+        })
+        .catch(function () {
+            container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
+        });
+}
+
+function appendSavedListItem(container, entry) {
         var div = document.createElement('div');
         div.className = 'saved-item' + (entry.id === NP.currentEntryId ? ' active' : '');
         div.dataset.id = entry.id;
@@ -520,10 +571,11 @@ function renderSavedList() {
             ev.stopPropagation();
             AccountifyUI.confirmDelete('Delete this saved page?').then(function (ok) {
                 if (!ok) return;
-                Storage.deleteNotepadEntry(entry.id);
-                if (NP.currentEntryId === entry.id) NP.currentEntryId = null;
-                AccountifyUI.toast('Page deleted', 'success');
-                renderSavedList();
+                SupabaseClient.deleteNotepadEntry(entry.id).then(function () {
+                    if (NP.currentEntryId === entry.id) NP.currentEntryId = null;
+                    AccountifyUI.toast('Page deleted', 'success');
+                    renderSavedList();
+                });
             });
         });
 
@@ -538,7 +590,6 @@ function renderSavedList() {
         });
 
         container.appendChild(div);
-    });
 }
 
 function loadEntry(entry) {
@@ -548,8 +599,11 @@ function loadEntry(entry) {
         var bgSel = document.getElementById('bgSelect');
         if (bgSel) bgSel.value = NP.bgType;
         var sub = document.getElementById('notepadSubjectSelect');
-        if (sub) sub.value = entry.subject || 'General';
-        NP.currentSubject = entry.subject || 'General';
+        var entryCode = window.AccolyStats
+            ? AccolyStats.normalizeSubjectCode(entry.subject)
+            : entry.subject || 'FAR';
+        if (sub) sub.value = entryCode;
+        NP.currentSubject = entryCode;
         drawBackground(NP.bgType);
 
         NP.ctx.clearRect(0, 0, NP.canvas.width, NP.canvas.height);
@@ -565,8 +619,10 @@ function loadEntry(entry) {
 }
 
 function logout() {
-    Storage.logout();
-    window.location.href = 'login.html';
+    SupabaseClient.signOut().finally(function () {
+        Storage.logout();
+        window.location.replace('login.html');
+    });
 }
 
 function drawBackground(type) {

@@ -20,24 +20,12 @@
 
     function upgradeToPremium() {
         if (window.AccolySubscription) return AccolySubscription.upgradeToPremium();
-        var user = getCurrentUserSafe();
-        if (!user) return false;
-        user.isPremium = true;
-        Storage.updateUser(user);
-        Storage.setCurrentUser(user);
-        Storage.addNotification({ userId: user.id, message: 'Welcome to Premium! Unlocking features now.' });
-        if (window.AccountifyNav) AccountifyNav.refreshNotifications();
-        return true;
+        return false;
     }
 
     function downgradeToBasic() {
         if (window.AccolySubscription) return AccolySubscription.downgradeToFree();
-        var user = getCurrentUserSafe();
-        if (!user) return false;
-        user.isPremium = false;
-        Storage.updateUser(user);
-        Storage.setCurrentUser(user);
-        return true;
+        return false;
     }
 
     window.AccolyPremium = {

@@ -7,47 +7,68 @@ function msgPremium() {
 // In-memory caches
 var MSG_ALL_USERS = [];
 var MSG_CONVO_CACHE = [];
+var MSG_GROUPS = [];
+
+var _messagesInitialized = false;
 
 document.addEventListener('DOMContentLoaded', function () {
     if (window.__authReady) {
         initMessages();
     } else {
-        window.addEventListener('authReady', initMessages);
+        window.addEventListener('authReady', initMessages, { once: true });
     }
 });
 
 function initMessages() {
+    if (_messagesInitialized) return;
     var user = Storage.getCurrentUser();
     if (!user) return;
+    _messagesInitialized = true;
 
     bindPremiumLocks();
     bindChatActions();
 
-    SupabaseClient.getAllUsers().then(function (users) {
-        MSG_ALL_USERS = users || [];
+    Promise.all([
+        SupabaseClient.getAllUsers(),
+        SupabaseClient.getGroups()
+    ]).then(function (results) {
+        MSG_ALL_USERS = results[0] || [];
+        MSG_GROUPS = results[1] || [];
         initUserPicker();
         renderConversationList();
         renderGroupList();
     }).catch(function () {
         MSG_ALL_USERS = [];
+        MSG_GROUPS = [];
         initUserPicker();
         renderConversationList();
         renderGroupList();
     });
 
-    // Poll for new messages every 5 seconds
     setInterval(function () {
         if (MSG.activeUserId) refreshActiveChat();
+        if (MSG.activeGroupId) refreshActiveGroupChat();
     }, 5000);
+}
 
-    // Groups still use localStorage
-    window.addEventListener('storage', function (e) {
-        if (!e || !e.key) return;
-        if (e.key === 'groupMessages' || e.key === 'groups') {
-            renderGroupList();
-            if (MSG.activeGroupId) renderChat();
-        }
+function reloadGroups() {
+    return SupabaseClient.getGroups().then(function (groups) {
+        MSG_GROUPS = groups || [];
+        renderGroupList();
     });
+}
+
+function getGroupsCache() {
+    return MSG_GROUPS || [];
+}
+
+function refreshActiveGroupChat() {
+    if (!MSG.activeGroupId) return;
+    SupabaseClient.getGroupMessages(MSG.activeGroupId).then(function (msgs) {
+        var chat = document.getElementById('chatMessages');
+        var me = Storage.getCurrentUser();
+        if (me && chat) renderMessages(chat, msgs || [], me.id);
+    }).catch(function () {});
 }
 
 function allUsersExceptMe() {
@@ -136,12 +157,11 @@ function openGroup(groupId) {
     }
     MSG.activeGroupId = groupId;
     MSG.activeUserId = null;
-    var groups = Storage.getGroups();
-    var g = groups.find(function (x) { return x.id === groupId; });
+    var g = getGroupsCache().find(function (x) { return x.id === groupId; });
     var me = Storage.getCurrentUser();
     var subjectLabel = g && g.subject && window.AccolyStats
         ? AccolyStats.getSubjectLabel(AccolyStats.normalizeSubjectCode(g.subject))
-        : (g && g.subject) || 'General';
+        : (g && g.subject) || 'FAR';
     document.getElementById('chatTitle').textContent = g ? g.name : 'Group chat';
     document.getElementById('chatSubtitle').textContent =
         (g && g.subject ? subjectLabel : 'Group') +
@@ -172,8 +192,11 @@ function renderChat() {
             AccountifyUI.toast('Group chat requires Premium', 'warning');
             return;
         }
-        var convo = Storage.getGroupConversation(MSG.activeGroupId);
-        renderMessages(chat, convo, me.id);
+        SupabaseClient.getGroupMessages(MSG.activeGroupId).then(function (convo) {
+            renderMessages(chat, convo || [], me.id);
+        }).catch(function () {
+            chat.innerHTML = '<p style="color:var(--text-secondary);">Could not load group messages.</p>';
+        });
         return;
     }
 
@@ -220,11 +243,15 @@ function renderGroupList() {
     var me = Storage.getCurrentUser();
     var listEl = document.getElementById('groupList');
     if (!listEl) return;
+    if (!me) {
+        listEl.innerHTML = '<p style="color:var(--text-secondary);margin:0;">Please log in to view groups.</p>';
+        return;
+    }
     if (!msgPremium()) {
         listEl.innerHTML = '<p style="color:var(--text-secondary);margin:0;">Group chat is Premium. Upgrade to join or create study groups.</p>';
         return;
     }
-    var groups = Storage.getGroups().filter(function (g) {
+    var groups = getGroupsCache().filter(function (g) {
         return Array.isArray(g.memberIds) && g.memberIds.indexOf(me.id) !== -1;
     });
     if (!groups.length) {
@@ -237,7 +264,7 @@ function renderGroupList() {
             '<div style="font-size:0.85rem;color:var(--text-secondary);">' + esc(
                 g.subject && window.AccolyStats
                     ? AccolyStats.getSubjectLabel(AccolyStats.normalizeSubjectCode(g.subject))
-                    : g.subject || 'General'
+                    : g.subject || 'FAR'
             ) + '</div>' +
             '</button>';
     }).join('');
@@ -274,25 +301,30 @@ function sendMessage() {
             sendBtn.disabled = false;
             return;
         }
-        try {
-            Storage.saveGroupMessage({ groupId: MSG.activeGroupId, fromUserId: me.id, body: body });
-            input.value = '';
-            var g = Storage.getGroups().find(function (x) { return x.id === MSG.activeGroupId; });
-            if (g && Array.isArray(g.memberIds)) {
-                g.memberIds.forEach(function (id) {
-                    if (id === me.id) return;
-                    SupabaseClient.addNotification({ userId: id, message: 'New group message in ' + esc(g.name || 'Group') }).catch(function () {});
-                });
-                if (window.AccountifyNav) AccountifyNav.refreshNotifications().catch(function () {});
-            }
-            renderChat();
-            renderGroupList();
-        } catch (err) {
-            AccountifyUI.toast('Failed to send message', 'error');
-        } finally {
-            input.disabled = false;
-            sendBtn.disabled = false;
-        }
+        SupabaseClient.saveGroupMessage({ groupId: MSG.activeGroupId, fromUserId: me.id, body: body })
+            .then(function (saved) {
+                if (!saved) {
+                    AccountifyUI.toast('Failed to send message', 'error');
+                    return;
+                }
+                input.value = '';
+                var g = getGroupsCache().find(function (x) { return x.id === MSG.activeGroupId; });
+                if (g && Array.isArray(g.memberIds)) {
+                    g.memberIds.forEach(function (id) {
+                        if (id === me.id) return;
+                        SupabaseClient.addNotification({ userId: id, message: 'New group message in ' + esc(g.name || 'Group') }).catch(function () {});
+                    });
+                    if (window.AccountifyNav) AccountifyNav.refreshNotifications().catch(function () {});
+                }
+                renderChat();
+            })
+            .catch(function () {
+                AccountifyUI.toast('Failed to send message', 'error');
+            })
+            .finally(function () {
+                input.disabled = false;
+                sendBtn.disabled = false;
+            });
         return;
     }
 
@@ -317,7 +349,21 @@ function sendMessage() {
         });
 }
 
+function refreshPremiumMessagingUi() {
+    var btn = document.getElementById('btnPremiumGroup');
+    if (btn) {
+        if (msgPremium()) {
+            btn.textContent = 'Create group';
+            btn.disabled = false;
+            btn.classList.remove('premium-locked');
+        } else {
+            btn.textContent = '🔒 Create group';
+        }
+    }
+}
+
 function bindPremiumLocks() {
+    refreshPremiumMessagingUi();
     var btn = document.getElementById('btnPremiumGroup');
     if (btn) {
         btn.setAttribute('data-premium', 'true');
@@ -377,16 +423,20 @@ function bindGroupModals() {
             AccountifyUI.toast('Enter a group name', 'warning');
             return;
         }
-        var g = Storage.saveGroup({
+        SupabaseClient.saveGroup({
             name: name,
             subject: subject,
             createdBy: me.id,
             memberIds: [me.id]
+        }).then(function (g) {
+            if (!g) {
+                AccountifyUI.toast('Could not create group', 'error');
+                return;
+            }
+            closeCreate();
+            AccountifyUI.toast('Group created', 'success');
+            reloadGroups().then(function () { openGroup(g.id); });
         });
-        closeCreate();
-        AccountifyUI.toast('Group created', 'success');
-        renderGroupList();
-        openGroup(g.id);
     });
 
     document.getElementById('groupMemberSave').addEventListener('click', function () {
@@ -401,22 +451,26 @@ function bindGroupModals() {
             AccountifyUI.toast('Open a group first', 'warning');
             return;
         }
-        var groups = Storage.getGroups();
-        var g = groups.find(function (x) { return x.id === MSG.activeGroupId; });
+        var g = getGroupsCache().find(function (x) { return x.id === MSG.activeGroupId; });
         if (!g) return;
         if (g.memberIds && g.memberIds.indexOf(userId) !== -1) {
             AccountifyUI.toast('Already in this group', 'warning');
             return;
         }
-        Storage.addMemberToGroup(MSG.activeGroupId, userId);
-        SupabaseClient.addNotification({
-            userId: userId,
-            message: 'You were added to group "' + (g.name || 'Study group') + '"'
-        }).catch(function () {});
-        closeMember();
-        AccountifyUI.toast('Member added', 'success');
-        openGroup(MSG.activeGroupId);
-        if (window.AccountifyNav) AccountifyNav.refreshNotifications().catch(function () {});
+        SupabaseClient.addMemberToGroup(MSG.activeGroupId, userId).then(function (ok) {
+            if (!ok) {
+                AccountifyUI.toast('Could not add member', 'error');
+                return;
+            }
+            SupabaseClient.addNotification({
+                userId: userId,
+                message: 'You were added to group "' + (g.name || 'Study group') + '"'
+            }).catch(function () {});
+            closeMember();
+            AccountifyUI.toast('Member added', 'success');
+            reloadGroups().then(function () { openGroup(MSG.activeGroupId); });
+            if (window.AccountifyNav) AccountifyNav.refreshNotifications().catch(function () {});
+        });
     });
 }
 
@@ -445,7 +499,7 @@ function openGroupMemberModal() {
     var hint = document.getElementById('groupMemberHint');
     if (!modal || !picker) return;
     var me = Storage.getCurrentUser();
-    var g = Storage.getGroups().find(function (x) { return x.id === MSG.activeGroupId; });
+    var g = getGroupsCache().find(function (x) { return x.id === MSG.activeGroupId; });
     if (!g) {
         AccountifyUI.toast('Select a group first', 'warning');
         return;

@@ -96,24 +96,18 @@ function subscribeToPremium() {
 }
 
 function clearData() {
-    if (!confirm('Are you sure? This will delete all your data including quiz attempts and notes.')) {
+    if (!confirm('Sign out? Your data stays in your Accountify cloud account. To delete cloud data, use Supabase dashboard or contact support.')) {
         return;
     }
-    
-    try {
-        localStorage.clear();
-        // Also clear IndexedDB if available
-        if (window.indexedDB) {
-            indexedDB.deleteDatabase('AccolyDB');
-        }
-        window.location.href = 'login.html';
-    } catch (error) {
-        console.error('Error clearing data:', error);
-        alert('Failed to clear all data. Please try again.');
-    }
+    SupabaseClient.signOut().finally(function () {
+        Storage.logout();
+        window.location.replace('login.html');
+    });
 }
 
 function logout() {
-    Storage.logout();
-    window.location.href = 'login.html';
+    SupabaseClient.signOut().finally(function () {
+        Storage.logout();
+        window.location.replace('login.html');
+    });
 }

@@ -1,5 +1,26 @@
-var NOTE_SUBJECTS = ['Financial Accounting', 'Cost Accounting', 'Auditing', 'Taxation', 'Business Law', 'General'];
+function getNoteSubjectCodes() {
+    if (window.AccolyStats) {
+        return AccolyStats.SUBJECT_CATALOG.map(function (c) {
+            return c.code;
+        });
+    }
+    return ['FAR', 'AFAR', 'MS', 'AUD', 'RFBT', 'TAX'];
+}
+
+function noteSubjectLabel(code) {
+    return window.AccolyStats ? AccolyStats.getSubjectLabel(code) : code;
+}
+
+function noteSubjectMatches(metaSubject, filterCode) {
+    if (filterCode === 'all') return true;
+    var norm = window.AccolyStats
+        ? AccolyStats.normalizeSubjectCode(metaSubject || '')
+        : metaSubject;
+    return norm === filterCode;
+}
+
 var ManagerState = { subject: 'all', search: '', sort: 'recent' };
+var NOTE_PDF_META = [];
 
 function esc(s) {
     var d = document.createElement('div');
@@ -49,19 +70,34 @@ function initNotesV2() {
     bindManagerEvents();
     bindPdfEditorEvents();
     bindBasicNoteModal();
-    renderPdfLibrary();
+    refreshPdfMetaList();
+}
+
+function refreshPdfMetaList() {
+    var user = Storage.getCurrentUser();
+    if (!user) return Promise.resolve();
+    return SupabaseClient.getPdfMetaList(user.id)
+        .then(function (list) {
+            NOTE_PDF_META = list || [];
+            renderPdfLibrary();
+        })
+        .catch(function () {
+            NOTE_PDF_META = [];
+            renderPdfLibrary();
+        });
 }
 
 function bindSubjectFilters() {
     var container = document.getElementById('subjectFilters');
     container.innerHTML = '';
-    var items = ['all'].concat(NOTE_SUBJECTS);
+    var items = ['all'].concat(getNoteSubjectCodes());
     items.forEach(function (s, idx) {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'filter-btn' + (idx === 0 ? ' active' : '');
         btn.dataset.subject = s;
-        btn.textContent = s === 'all' ? 'All subjects' : s;
+        btn.textContent = s === 'all' ? 'All subjects' : noteSubjectLabel(s);
+        if (s !== 'all') btn.title = noteSubjectLabel(s);
         btn.addEventListener('click', function () {
             ManagerState.subject = s;
             container.querySelectorAll('.filter-btn').forEach(function (x) { x.classList.toggle('active', x === btn); });
@@ -134,14 +170,18 @@ async function uploadPdf(file) {
     var user = Storage.getCurrentUser();
     if (!user) { AccountifyUI.toast('Please login to upload files', 'error'); return; }
     try {
-        var id = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
-        var meta = Storage.savePdfMeta({ id: id, userId: user.id, name: fileName, subject: ManagerState.subject !== 'all' ? ManagerState.subject : 'General' });
-        await Storage.savePdfBinary({ id: id, userId: user.id, name: meta.name, blob: file });
+        var meta = await SupabaseClient.savePdfMeta({
+            userId: user.id,
+            name: fileName,
+            subject: ManagerState.subject !== 'all' ? ManagerState.subject : 'FAR'
+        });
+        if (!meta) throw new Error('meta_save_failed');
+        await SupabaseClient.savePdfBinary({ id: meta.id, userId: user.id, name: meta.name, blob: file });
         meta.thumbnail = await createPdfThumbnail(file);
-        Storage.savePdfMeta(meta);
+        await SupabaseClient.savePdfMeta(meta);
         AccountifyUI.toast('PDF uploaded successfully', 'success');
-        renderPdfLibrary();
-        openPdfEditor(id);
+        await refreshPdfMetaList();
+        openPdfEditor(meta.id);
     } catch (error) {
         console.error('PDF upload error:', error);
         AccountifyUI.toast('Failed to upload PDF', 'error');
@@ -149,9 +189,12 @@ async function uploadPdf(file) {
 }
 
 function getFilteredMeta() {
-    var user = Storage.getCurrentUser();
-    var list = Storage.getPdfMetaList(user.id);
-    if (ManagerState.subject !== 'all') list = list.filter(function (m) { return m.subject === ManagerState.subject; });
+    var list = NOTE_PDF_META.slice();
+    if (ManagerState.subject !== 'all') {
+        list = list.filter(function (m) {
+            return noteSubjectMatches(m.subject, ManagerState.subject);
+        });
+    }
     if (ManagerState.search) list = list.filter(function (m) { return (m.name || '').toLowerCase().indexOf(ManagerState.search) !== -1; });
     list.sort(function (a, b) {
         if (ManagerState.sort === 'name') return (a.name || '').localeCompare(b.name || '');
@@ -208,26 +251,22 @@ function renderMetaSection(containerId, items) {
 }
 
 async function renamePdf(id) {
-    var user = Storage.getCurrentUser();
-    var list = Storage.getPdfMetaList(user.id);
-    var m = list.find(function (x) { return x.id === id; });
+    var m = NOTE_PDF_META.find(function (x) { return x.id === id; });
     if (!m) return;
     var name = window.prompt('Rename PDF', m.name || '');
     if (!name) return;
     m.name = name.trim() || m.name;
     m.updatedAt = new Date().toISOString();
-    Storage.savePdfMeta(m);
-    renderPdfLibrary();
+    await SupabaseClient.savePdfMeta(m);
+    await refreshPdfMetaList();
 }
 
 async function deletePdf(id) {
     AccountifyUI.confirmDelete('Delete this PDF and all annotations?').then(async function (ok) {
         if (!ok) return;
-        await Storage.deletePdfBinary(id);
-        Storage.deletePdfMeta(id);
-        Storage.deletePdfAnnotationsV2(id);
+        await SupabaseClient.deletePdfMeta(id);
         AccountifyUI.toast('PDF deleted', 'success');
-        renderPdfLibrary();
+        await refreshPdfMetaList();
     });
 }
 
@@ -300,13 +339,19 @@ function bindPdfEditorEvents() {
 async function openPdfEditor(fileId) {
     if (!window.pdfjsLib) return AccountifyUI.toast('PDF.js failed to load', 'error');
     var user = Storage.getCurrentUser();
-    var meta = Storage.getPdfMetaList(user.id).find(function (x) { return x.id === fileId; });
-    var binary = await Storage.getPdfBinary(fileId);
+    var meta = NOTE_PDF_META.find(function (x) { return x.id === fileId; });
+    if (!meta) {
+        var list = await SupabaseClient.getPdfMetaList(user.id);
+        NOTE_PDF_META = list || [];
+        meta = NOTE_PDF_META.find(function (x) { return x.id === fileId; });
+    }
+    var binary = await SupabaseClient.getPdfBinary(fileId);
     if (!meta || !binary) return AccountifyUI.toast('PDF not found', 'error');
     PDF.fileId = fileId;
     PDF.meta = meta;
     PDF.zoom = 1;
-    PDF.annotations = Storage.getPdfAnnotationsV2(fileId) || { pages: {} };
+    var ann = await SupabaseClient.getPdfAnnotationsV2(fileId);
+    PDF.annotations = { pages: (ann && ann.pages) ? ann.pages : {} };
     PDF.pages = {};
     PDF.pageOrder = [];
     PDF.history = [];
@@ -322,8 +367,8 @@ async function openPdfEditor(fileId) {
     bindScrollSync();
     pushPdfHistory();
     meta.lastOpenedAt = new Date().toISOString();
-    Storage.savePdfMeta(meta);
-    renderPdfLibrary();
+    await SupabaseClient.savePdfMeta(meta);
+    await refreshPdfMetaList();
 }
 
 function closePdfEditor() {
@@ -892,18 +937,23 @@ function annotationCount(payload) {
 
 function forceSaveAnnotations() {
     if (!PDF.fileId) return;
-    Storage.savePdfAnnotationsV2(PDF.fileId, PDF.annotations);
     var user = Storage.getCurrentUser();
-    var meta = Storage.getPdfMetaList(user.id).find(function (x) { return x.id === PDF.fileId; });
-    if (meta) {
-        meta.updatedAt = new Date().toISOString();
-        meta.isEdited = annotationCount(PDF.annotations) > 0;
-        meta.annotationCount = annotationCount(PDF.annotations);
-        Storage.savePdfMeta(meta);
-    }
-    PDF.dirty = false;
-    updateSaveStatus('Saved');
-    renderPdfLibrary();
+    if (!user) return;
+    SupabaseClient.savePdfAnnotationsV2(PDF.fileId, PDF.annotations, user.id).then(function () {
+        var meta = NOTE_PDF_META.find(function (x) { return x.id === PDF.fileId; });
+        if (meta) {
+            meta.updatedAt = new Date().toISOString();
+            meta.isEdited = annotationCount(PDF.annotations) > 0;
+            meta.annotationCount = annotationCount(PDF.annotations);
+            return SupabaseClient.savePdfMeta(meta);
+        }
+    }).then(function () {
+        PDF.dirty = false;
+        updateSaveStatus('Saved');
+        refreshPdfMetaList();
+    }).catch(function () {
+        updateSaveStatus('Save failed');
+    });
 }
 
 function setZoom(next) {
@@ -1032,19 +1082,38 @@ function bindBasicNoteModal() {
     document.getElementById('noteSaveBtn').addEventListener('click', saveSimpleNoteModal);
     modal.addEventListener('click', function (e) { if (e.target && e.target.id === 'noteModal') closeSimpleNoteModal(); });
     var sel = document.getElementById('noteSubject');
-    sel.innerHTML = NOTE_SUBJECTS.map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('');
+    sel.innerHTML = getNoteSubjectCodes()
+        .map(function (s) {
+            return '<option value="' + escAttr(s) + '">' + esc(noteSubjectLabel(s)) + '</option>';
+        })
+        .join('');
 }
 
 function openSimpleNoteModal() { document.getElementById('noteTitle').value = ''; document.getElementById('noteContent').value = ''; document.getElementById('noteModal').classList.add('open'); }
 function closeSimpleNoteModal() { document.getElementById('noteModal').classList.remove('open'); }
 function saveSimpleNoteModal() {
     var user = Storage.getCurrentUser();
-    Storage.saveNote({ userId: user.id, title: (document.getElementById('noteTitle').value || 'Untitled').trim(), subject: document.getElementById('noteSubject').value, content: document.getElementById('noteContent').value || '' });
-    AccountifyUI.toast('Note saved', 'success');
-    closeSimpleNoteModal();
+    SupabaseClient.saveNote({
+        userId: user.id,
+        title: (document.getElementById('noteTitle').value || 'Untitled').trim(),
+        subject: document.getElementById('noteSubject').value,
+        content: document.getElementById('noteContent').value || ''
+    }).then(function (saved) {
+        if (!saved) {
+            AccountifyUI.toast('Could not save note', 'error');
+            return;
+        }
+        AccountifyUI.toast('Note saved', 'success');
+        closeSimpleNoteModal();
+    });
 }
 
-function logout() { Storage.logout(); window.location.href = 'login.html'; }    
+function logout() {
+    SupabaseClient.signOut().finally(function () {
+        Storage.logout();
+        window.location.replace('login.html');
+    });
+}    
 
 function clearAllPages() {
     PDF.pageOrder.forEach(function (pageNum) {

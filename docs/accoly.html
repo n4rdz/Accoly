@@ -690,6 +690,8 @@
     <input type="file" id="importFileInput" accept=".json" style="display: none;">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabase-client.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
     <script>
         // PDF.js Setup
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1724,29 +1726,25 @@
         // ============================================================================
         // SAVE/RESTORE
         // ============================================================================
-        function saveAnnotations() {
+        async function saveAnnotations() {
             if (!state.pdfName) return;
-            
-            const data = {
-                pdfName: state.pdfName,
-                annotations: state.annotations,
-                savedAt: new Date().toISOString()
-            };
-            
-            localStorage.setItem(`accoly_${state.pdfName}`, JSON.stringify(data));
+            const user = Storage.getCurrentUser();
+            if (!user) return;
+            try {
+                await SupabaseClient.saveAccolyAnnotations(user.id, state.pdfName, state.annotations);
+            } catch (e) {
+                console.error('Error saving annotations:', e);
+            }
         }
 
-        function loadAnnotations() {
+        async function loadAnnotations() {
             if (!state.pdfName) return;
-            
-            const stored = localStorage.getItem(`accoly_${state.pdfName}`);
-            if (stored) {
-                try {
-                    const data = JSON.parse(stored);
-                    state.annotations = data.annotations || {};
-                } catch (e) {
-                    console.error('Error loading annotations:', e);
-                }
+            const user = Storage.getCurrentUser();
+            if (!user) return;
+            try {
+                state.annotations = await SupabaseClient.getAccolyAnnotations(user.id, state.pdfName) || {};
+            } catch (e) {
+                console.error('Error loading annotations:', e);
             }
         }
 

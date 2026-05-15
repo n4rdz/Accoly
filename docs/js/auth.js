@@ -3,7 +3,6 @@
 // ============================================
 // Depends on: supabase-client.js loaded before this file
 
-// Inject loading overlay immediately — before DOMContentLoaded
 (function () {
     var currentPage = window.location.pathname.split('/').pop() || 'index.html';
     var isAuthPage = currentPage.includes('login') ||
@@ -28,8 +27,6 @@ function removeOverlay() {
     if (el) el.remove();
 }
 
-// Build a minimal profile from the Supabase session when the profiles table
-// row is missing (e.g. RLS blocked the upsert, or email not yet confirmed).
 function profileFromSession(session) {
     var u = session.user;
     var meta = (u.user_metadata) || {};
@@ -46,12 +43,50 @@ function profileFromSession(session) {
     };
 }
 
-// Load profile from DB; fall back to session metadata if missing.
+var _profileLoadPromise = null;
+var _authReadyUserId = null;
+
+function fireAuthReadyOnce() {
+    var user = Storage.getCurrentUser();
+    var uid = user && user.id;
+    if (window.__authReady && _authReadyUserId === uid) return;
+    _authReadyUserId = uid || null;
+    window.__authReady = true;
+    window.dispatchEvent(new Event('authReady'));
+    removeOverlay();
+}
+
+function resetAuthReadyState() {
+    _profileLoadPromise = null;
+    _authReadyUserId = null;
+    window.__authReady = false;
+}
+
+function clearStaleAuthAndRedirect(isProtectedPage) {
+    resetAuthReadyState();
+    Storage.logout();
+    if (typeof clearSupabaseAuthStorage === 'function') clearSupabaseAuthStorage();
+    var done = function () {
+        if (isProtectedPage) {
+            window.location.replace('login.html');
+        } else {
+            fireAuthReadyOnce();
+        }
+    };
+    if (window._sb && _sb.auth) {
+        _sb.auth.signOut({ scope: 'local' }).then(done).catch(done);
+    } else {
+        done();
+    }
+}
+
 function loadProfileAndReady(session) {
-    SupabaseClient.getProfile(session.user.id).then(function (profile) {
+    if (!session || !session.user) return Promise.resolve();
+    if (_profileLoadPromise) return _profileLoadPromise;
+
+    _profileLoadPromise = SupabaseClient.getProfile(session.user.id).then(function (profile) {
         var resolved_profile = profile || profileFromSession(session);
         Storage.setCurrentUser(resolved_profile);
-        // If the profile row was missing, try to create it now in the background
         if (!profile) {
             _sb.from('profiles').upsert({
                 id: session.user.id,
@@ -60,28 +95,19 @@ function loadProfileAndReady(session) {
                 role: 'basic',
                 subscription_status: 'free',
                 created_at: resolved_profile.createdAt
-            }).then(function() {}).catch(function() {});
+            }).then(function () {}).catch(function () {});
         }
-        window.__authReady = true;
-        window.dispatchEvent(new Event('authReady'));
-        removeOverlay();
+        fireAuthReadyOnce();
     }).catch(function () {
-        var fallback = profileFromSession(session);
-        Storage.setCurrentUser(fallback);
-        window.__authReady = true;
-        window.dispatchEvent(new Event('authReady'));
-        removeOverlay();
+        Storage.setCurrentUser(profileFromSession(session));
+        fireAuthReadyOnce();
     });
+
+    return _profileLoadPromise;
 }
 
-// Global flag so other scripts (dashboard.js, etc.) know auth is ready
 window.__authReady = false;
 
-// ── Core auth check — runs immediately, NOT inside DOMContentLoaded ──────────
-// Supabase fires onAuthStateChange with (null session) first on some page loads
-// before the real session token is read from storage. Putting this inside
-// DOMContentLoaded made the race worse. Running it immediately gives Supabase
-// the maximum time to resolve the session before the page JS tries to use it.
 (function () {
     var currentPage = window.location.pathname.split('/').pop() || 'index.html';
     var isAuthPage = currentPage.includes('login') ||
@@ -91,74 +117,92 @@ window.__authReady = false;
 
     var resolved = false;
 
-    // Use getSession() first — it reads from localStorage synchronously and is
-    // reliable. onAuthStateChange alone can fire INITIAL_SESSION with null on
-    // the first tick, causing a false redirect before the token is verified.
+    function finishWithSession(session) {
+        if (!session) return;
+        if (isAuthPage && currentPage !== 'index.html') {
+            window.location.replace('dashboard.html');
+            return;
+        }
+        loadProfileAndReady(session);
+    }
+
+    function finishSignedOut() {
+        if (isProtectedPage) {
+            clearStaleAuthAndRedirect(true);
+        } else {
+            fireAuthReadyOnce();
+        }
+    }
+
     _sb.auth.getSession().then(function (result) {
         if (resolved) return;
 
-        var session = result && result.data && result.data.session;
-
-        if (session) {
-            // Valid session — load profile then signal ready
+        var err = result && result.error;
+        if (err && isInvalidRefreshTokenError(err)) {
             resolved = true;
-            if (isAuthPage && currentPage !== 'index.html') {
-                window.location.replace('dashboard.html');
+            clearStaleAuthAndRedirect(isProtectedPage);
+            return;
+        }
+
+        var session = result && result.data && result.data.session;
+        if (!session) return;
+
+        return _sb.auth.getUser().then(function (userResult) {
+            if (resolved) return;
+            var userErr = userResult && userResult.error;
+            if (userErr && isInvalidRefreshTokenError(userErr)) {
+                resolved = true;
+                clearStaleAuthAndRedirect(isProtectedPage);
                 return;
             }
-            loadProfileAndReady(session);
-        } else {
-            // No session from storage — wait briefly for onAuthStateChange
-            // in case Supabase is still verifying a token (e.g. OAuth callback)
-            // The timeout below acts as the final fallback.
+            if (userResult && userResult.data && userResult.data.user) {
+                resolved = true;
+                finishWithSession(session);
+            }
+        });
+    }).catch(function (err) {
+        if (isInvalidRefreshTokenError(err)) {
+            resolved = true;
+            clearStaleAuthAndRedirect(isProtectedPage);
         }
-    }).catch(function () {
-        // getSession failed — fall through to onAuthStateChange / timeout
     });
 
-    // onAuthStateChange handles token refreshes and post-login events
     _sb.auth.onAuthStateChange(function (event, session) {
-        if (resolved) return;
+        if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+            if (isProtectedPage) {
+                clearStaleAuthAndRedirect(true);
+            } else {
+                resetAuthReadyState();
+                Storage.logout();
+                fireAuthReadyOnce();
+            }
+            return;
+        }
 
-        // Ignore the very first INITIAL_SESSION null — getSession() above
-        // already handled the no-session case more reliably.
+        if (resolved) return;
         if (!session && event === 'INITIAL_SESSION') return;
 
         resolved = true;
 
         if (session) {
-            if (isAuthPage && currentPage !== 'index.html') {
-                window.location.replace('dashboard.html');
-                return;
-            }
-            loadProfileAndReady(session);
+            finishWithSession(session);
         } else {
-            if (isProtectedPage) {
-                window.location.replace('login.html');
-                return;
-            }
-            window.__authReady = true;
-            window.dispatchEvent(new Event('authReady'));
-            removeOverlay();
+            finishSignedOut();
         }
     });
 
-    // Safety fallback: if neither getSession nor onAuthStateChange resolve in 4s
     setTimeout(function () {
         if (!resolved) {
             resolved = true;
             if (isProtectedPage) {
                 window.location.replace('login.html');
             } else {
-                window.__authReady = true;
-                window.dispatchEvent(new Event('authReady'));
-                removeOverlay();
+                fireAuthReadyOnce();
             }
         }
     }, 4000);
 })();
 
-// ── Bind login/signup forms after DOM is ready ───────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
     var loginForm = document.getElementById('loginForm');
     if (loginForm) {
@@ -176,7 +220,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-
 async function handleLogin() {
     clearFieldErrors();
     const email = document.getElementById('email').value.trim().toLowerCase();
@@ -189,8 +232,12 @@ async function handleLogin() {
     }
 
     try {
+        resetAuthReadyState();
         const { session, error } = await SupabaseClient.signIn(email, password);
         if (error) {
+            if (isInvalidRefreshTokenError(error)) {
+                clearStaleAuthAndRedirect(false);
+            }
             if (error.message && error.message.toLowerCase().includes('invalid')) {
                 showError(errorDiv, 'Incorrect email or password.');
                 setFieldError('password', 'Incorrect email or password.');
@@ -250,15 +297,11 @@ async function handleSignup() {
     }
 
     try {
+        resetAuthReadyState();
         const { session, error } = await SupabaseClient.signUp(email, password, fullName);
 
         if (error) {
-            if (error.message && error.message.toLowerCase().includes('already')) {
-                setFieldError('email', 'Email already registered.');
-                showError(errorDiv, 'Email already registered. Please login instead.');
-            } else {
-                showError(errorDiv, error.message || 'Registration failed. Please try again.');
-            }
+            showError(errorDiv, error.message || 'Registration failed. Please try again.');
             return;
         }
 
@@ -276,8 +319,8 @@ async function handleSignup() {
     }
 }
 
-// Called from sidebar logout buttons
 async function logout() {
+    resetAuthReadyState();
     await SupabaseClient.signOut();
     Storage.logout();
     window.location.replace('login.html');
