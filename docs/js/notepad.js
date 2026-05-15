@@ -17,7 +17,8 @@ var NP = {
     history: [],
     historyStep: -1,
     maxHistory: 28,
-    currentEntryId: null
+    currentEntryId: null,
+    currentSubject: 'General'
 };
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -39,6 +40,7 @@ function initNotepad() {
 
     initCanvasSurface();
     bindToolbars();
+    bindNotepadExtras();
     bindCanvasEvents();
     renderSavedList();
 
@@ -188,6 +190,65 @@ function bindToolbars() {
 
     document.getElementById('btnSaveDrawing').addEventListener('click', saveDrawing);
     document.getElementById('btnExportPng').addEventListener('click', exportPng);
+}
+
+function bindNotepadExtras() {
+    var subSel = document.getElementById('notepadSubjectSelect');
+    if (subSel) {
+        subSel.value = NP.currentSubject || 'General';
+        subSel.addEventListener('change', function () {
+            NP.currentSubject = subSel.value || 'General';
+            NP.currentEntryId = null;
+            document.querySelectorAll('.saved-item').forEach(function (el) {
+                el.classList.remove('active');
+            });
+            renderSavedList();
+        });
+    }
+
+    var upInput = document.getElementById('notepadUploadInput');
+    var upBtn = document.getElementById('btnUploadNotepad');
+    if (upBtn && upInput) {
+        upBtn.addEventListener('click', function () {
+            upInput.value = '';
+            upInput.click();
+        });
+        upInput.addEventListener('change', function () {
+            var f = upInput.files && upInput.files[0];
+            if (!f) return;
+            if (!/^image\//.test(f.type)) {
+                AccountifyUI.toast('Please choose an image file', 'warning');
+                return;
+            }
+            var url = URL.createObjectURL(f);
+            var img = new Image();
+            img.onload = function () {
+                try {
+                    NP.ctx.drawImage(img, 0, 0, NP.canvas.width, NP.canvas.height);
+                    pushHistory();
+                    AccountifyUI.toast('Image placed on canvas', 'success');
+                } finally {
+                    URL.revokeObjectURL(url);
+                }
+            };
+            img.onerror = function () {
+                URL.revokeObjectURL(url);
+                AccountifyUI.toast('Could not load image', 'error');
+            };
+            img.src = url;
+        });
+    }
+
+    var fsBtn = document.getElementById('btnNotepadFullscreen');
+    if (fsBtn) {
+        fsBtn.addEventListener('click', function () {
+            var shell = document.getElementById('notepadShell');
+            if (shell) shell.classList.toggle('notepad-shell--fullscreen');
+            document.body.classList.toggle('notepad-fullscreen-canvas');
+            fsBtn.textContent = document.body.classList.contains('notepad-fullscreen-canvas') ? 'Exit full' : 'Full canvas';
+            scheduleResizeCanvas();
+        });
+    }
 }
 
 function applyToolStyle() {
@@ -353,7 +414,8 @@ function saveDrawing() {
             imageData: imageData,
             previewDataUrl: imageData,
             drawDataUrl: drawDataUrl,
-            bgType: NP.bgType
+            bgType: NP.bgType,
+            subject: NP.currentSubject || 'General'
         };
         
         if (NP.currentEntryId) {
@@ -361,7 +423,10 @@ function saveDrawing() {
             var existing = Storage.getNotepadEntries(user.id).find(function (x) {
                 return x.id === NP.currentEntryId;
             });
-            if (existing) payload.createdAt = existing.createdAt;
+            if (existing) {
+            payload.createdAt = existing.createdAt;
+            if (!payload.subject && existing.subject) payload.subject = existing.subject;
+        }
         }
         
         var saved = Storage.saveNotepadEntry(payload);
@@ -399,7 +464,10 @@ function exportPng() {
 
 function renderSavedList() {
     var user = Storage.getCurrentUser();
-    var list = Storage.getNotepadEntries(user.id).slice().sort(function (a, b) {
+    var sub = NP.currentSubject || 'General';
+    var list = Storage.getNotepadEntries(user.id).filter(function (e) {
+        return (e.subject || 'General') === sub;
+    }).slice().sort(function (a, b) {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
@@ -479,6 +547,9 @@ function loadEntry(entry) {
         NP.bgType = entry.bgType || 'white';
         var bgSel = document.getElementById('bgSelect');
         if (bgSel) bgSel.value = NP.bgType;
+        var sub = document.getElementById('notepadSubjectSelect');
+        if (sub) sub.value = entry.subject || 'General';
+        NP.currentSubject = entry.subject || 'General';
         drawBackground(NP.bgType);
 
         NP.ctx.clearRect(0, 0, NP.canvas.width, NP.canvas.height);

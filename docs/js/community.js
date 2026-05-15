@@ -6,6 +6,13 @@ var communityState = { sort: 'newest', search: '', type: 'all', tag: '' };
 var postModalState = { editingId: null };
 var COMM_POSTS = []; // in-memory cache
 
+function shapePostReactions(post) {
+    if (!post || !post.reactions) post.reactions = {};
+    ['like', 'love', 'laugh', 'helpful', 'dislike'].forEach(function (k) {
+        if (!Array.isArray(post.reactions[k])) post.reactions[k] = [];
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     if (window.__authReady) {
         initCommunity();
@@ -37,7 +44,10 @@ function initCommunity() {
 // ── Load from Supabase then render ────────────────────────────────────────────
 function loadAndRender() {
     SupabaseClient.getPosts().then(function (posts) {
-        COMM_POSTS = posts || [];
+        COMM_POSTS = (posts || []).map(function (p) {
+            shapePostReactions(p);
+            return p;
+        });
         // Seed if totally empty
         if (!COMM_POSTS.length) {
             seedCommunity();
@@ -101,6 +111,8 @@ function openPostModal(postId) {
     var typeEl = document.getElementById('postModalType');
     var tagsEl = document.getElementById('postModalTags');
     var saveBtn = document.getElementById('postModalSaveBtn');
+    var anonRow = document.getElementById('postModalAnonymousRow');
+    var anonChk = document.getElementById('postModalAnonymous');
 
     postModalState.editingId = postId || null;
 
@@ -113,12 +125,18 @@ function openPostModal(postId) {
         contentEl.value = post.content || '';
         typeEl.value = post.type || 'Discussion';
         tagsEl.value = (post.tags || []).join(', ');
+        if (anonRow) anonRow.style.display = 'none';
     } else {
         titleEl.textContent = 'Create Post';
         saveBtn.textContent = 'Post';
         contentEl.value = '';
         typeEl.value = 'Discussion';
         tagsEl.value = '';
+        if (anonRow && anonChk) {
+            anonChk.checked = false;
+            var pr = window.AccolySubscription && AccolySubscription.isPremiumUser();
+            anonRow.style.display = pr ? 'block' : 'none';
+        }
     }
 
     modal.classList.add('open');
@@ -160,6 +178,11 @@ function saveFromPostModal() {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
 
+    var premium = window.AccolySubscription && AccolySubscription.isPremiumUser();
+    var anonEl = document.getElementById('postModalAnonymous');
+    var wantAnon = !!(premium && anonEl && anonEl.checked);
+    var displayName = wantAnon ? 'Anonymous' : (me.fullName || 'Student');
+
     var postData;
     if (postModalState.editingId) {
         var existing = COMM_POSTS.find(function (p) { return p.id === postModalState.editingId; });
@@ -173,11 +196,11 @@ function saveFromPostModal() {
     } else {
         postData = {
             userId: me.id,
-            userName: me.fullName || 'Student',
+            userName: displayName,
             content: content,
             type: type,
             tags: tags,
-            reactions: { like: [], love: [], laugh: [], helpful: [] },
+            reactions: { like: [], love: [], laugh: [], helpful: [], dislike: [] },
             comments: []
         };
     }
@@ -202,7 +225,7 @@ function seedCommunity() {
             userId: 'system', userName: 'Accoly Team', type: 'Problem',
             content: 'How do you approach deferred tax liability adjustments quickly?',
             tags: ['Taxation', 'exam-tip'],
-            reactions: { like: [], love: [], laugh: [], helpful: [] },
+            reactions: { like: [], love: [], laugh: [], helpful: [], dislike: [] },
             comments: [{ id: 'seed-c1', userId: 'system', userName: 'Accoly Team', content: 'Share your quick rules-of-thumb and common pitfalls.', createdAt: new Date(Date.now() - 55 * 60000).toISOString() }],
             createdAt: new Date(Date.now() - 75 * 60000).toISOString()
         },
@@ -210,7 +233,7 @@ function seedCommunity() {
             userId: 'system', userName: 'Accoly Team', type: 'Casual',
             content: 'Saturday group study session starts at 8 PM. Drop your topics so we can prep.',
             tags: ['Auditing', 'study-group'],
-            reactions: { like: [], love: [], laugh: [], helpful: [] },
+            reactions: { like: [], love: [], laugh: [], helpful: [], dislike: [] },
             comments: [],
             createdAt: new Date(Date.now() - 3 * 3600000).toISOString()
         }
@@ -225,17 +248,30 @@ function toggleReaction(postId, reactionKey) {
     var post = COMM_POSTS.find(function (p) { return p.id === postId; });
     if (!me || !post) return;
 
-    post.reactions = post.reactions || { like: [], love: [], laugh: [], helpful: [] };
-    ['like', 'love', 'laugh', 'helpful'].forEach(function (k) {
+    post.reactions = post.reactions || { like: [], love: [], laugh: [], helpful: [], dislike: [] };
+    ['like', 'love', 'laugh', 'helpful', 'dislike'].forEach(function (k) {
         if (!Array.isArray(post.reactions[k])) post.reactions[k] = [];
     });
 
-    var current = myReaction(post, me.id);
-    if (current === reactionKey) {
-        post.reactions[reactionKey] = post.reactions[reactionKey].filter(function (id) { return id !== me.id; });
+    var isProblem = (post.type === 'Problem');
+    if (isProblem) {
+        if (reactionKey !== 'like' && reactionKey !== 'dislike') return;
+        var cur = myReactionProblem(post, me.id);
+        if (cur === reactionKey) {
+            post.reactions[reactionKey] = post.reactions[reactionKey].filter(function (id) { return id !== me.id; });
+        } else {
+            if (cur) post.reactions[cur] = post.reactions[cur].filter(function (id) { return id !== me.id; });
+            post.reactions[reactionKey].push(me.id);
+        }
     } else {
-        if (current) post.reactions[current] = post.reactions[current].filter(function (id) { return id !== me.id; });
-        post.reactions[reactionKey].push(me.id);
+        if (reactionKey === 'helpful' || reactionKey === 'dislike') return;
+        var current = myReaction(post, me.id);
+        if (current === reactionKey) {
+            post.reactions[reactionKey] = post.reactions[reactionKey].filter(function (id) { return id !== me.id; });
+        } else {
+            if (current) post.reactions[current] = post.reactions[current].filter(function (id) { return id !== me.id; });
+            post.reactions[reactionKey].push(me.id);
+        }
     }
 
     // Optimistic UI update
@@ -334,6 +370,28 @@ function getFilteredPosts() {
     return posts;
 }
 
+// ── Contributor scores (posts + helpful recognition + own comments) ─────────
+function getContributorMap() {
+    var scores = {};
+    COMM_POSTS.forEach(function (p) {
+        if (!p.userId || p.userId === 'system') return;
+        if (!scores[p.userId]) scores[p.userId] = { userId: p.userId, name: p.userName || 'Student', posts: 0, comments: 0, helpfulRec: 0, total: 0 };
+        scores[p.userId].posts += 1;
+        if (p.type === 'Problem') {
+            scores[p.userId].helpfulRec += (p.reactions && p.reactions.like ? p.reactions.like.length : 0);
+        } else {
+            scores[p.userId].helpfulRec += (p.reactions && p.reactions.helpful ? p.reactions.helpful.length : 0);
+        }
+        scores[p.userId].comments += (p.comments || []).filter(function (c) { return c.userId === p.userId; }).length;
+        scores[p.userId].name = p.userName || scores[p.userId].name;
+    });
+    Object.keys(scores).forEach(function (uid) {
+        var s = scores[uid];
+        s.total = s.posts * 3 + s.helpfulRec * 2 + s.comments;
+    });
+    return scores;
+}
+
 // ── Render feed ───────────────────────────────────────────────────────────────
 function renderFeed() {
     var feed = document.getElementById('communityFeed');
@@ -344,6 +402,8 @@ function renderFeed() {
         feed.innerHTML = '<div class="empty-state"><h3>No matching posts</h3><p>Try a different filter or be the first to post!</p></div>';
         return;
     }
+
+    var contribMap = getContributorMap();
 
     feed.innerHTML = posts.map(function (p) {
         var tags = (p.tags || []).map(function (t) {
@@ -358,7 +418,10 @@ function renderFeed() {
               '</div>'
             : '';
 
-        var mineReaction = me ? myReaction(p, me.id) : null;
+        var mineReaction = null;
+        if (me) {
+            mineReaction = (p.type === 'Problem') ? myReactionProblem(p, me.id) : myReaction(p, me.id);
+        }
 
         function rxBtn(key, label) {
             var active = mineReaction === key ? ' reaction-btn--active' : '';
@@ -366,6 +429,18 @@ function renderFeed() {
             return '<button type="button" class="reaction-btn' + active + '" data-id="' + escAttr(p.id) + '" data-rx="' + escAttr(key) + '">' +
                 label + ' <span class="reaction-count">' + count + '</span></button>';
         }
+
+        var reactionHtml = (p.type === 'Problem')
+            ? (rxBtn('like', '👍 Helpful') + rxBtn('dislike', '👎 Dislike'))
+            : (rxBtn('like', '👍 Like') + rxBtn('love', '❤️ Love') + rxBtn('laugh', '😂 Haha'));
+
+        var showAnon = !!(p.isAnonymous || p.userName === 'Anonymous');
+        var authName = showAnon ? 'Anonymous' : (p.userName || 'Student');
+        var authInitials = showAnon ? '?' : initials(p.userName || 'Student');
+        var pts = (p.userId && contribMap[p.userId]) ? contribMap[p.userId].total : 0;
+        var topBadge = (p.userId && p.userId !== 'system' && pts >= 100)
+            ? ' <span style="font-size:0.72rem;font-weight:700;color:var(--primary);margin-left:0.35rem;">Top Contributor</span>'
+            : '';
 
         var comments = Array.isArray(p.comments) ? p.comments : [];
         var commentList = comments.length === 0
@@ -387,9 +462,9 @@ function renderFeed() {
 
         return '<article class="card community-post" data-post="' + escAttr(p.id) + '">' +
             '<div class="post-head">' +
-            '<div class="post-avatar">' + esc(initials(p.userName || 'Student')) + '</div>' +
+            '<div class="post-avatar">' + esc(authInitials) + '</div>' +
             '<div class="post-meta">' +
-            '<div class="post-meta__top"><span class="post-author">' + esc(p.userName || 'Student') + '</span>' +
+            '<div class="post-meta__top"><span class="post-author">' + esc(authName) + '</span>' + topBadge +
             '<span class="post-type">' + esc(p.type || 'Discussion') + '</span></div>' +
             '<div class="post-time">' + timeAgo(p.createdAt) + '</div>' +
             '</div>' +
@@ -397,10 +472,7 @@ function renderFeed() {
             '<div class="post-content">' + esc(p.content || '') + '</div>' +
             '<div class="post-tags">' + tags + '</div>' +
             '<div class="post-reactions">' +
-            rxBtn('like', '👍 Like') +
-            rxBtn('love', '❤️ Love') +
-            rxBtn('laugh', '😂 Haha') +
-            rxBtn('helpful', '💡 Helpful') +
+            reactionHtml +
             '</div>' +
             actionHtml +
             '<div class="post-comments">' +
@@ -454,20 +526,8 @@ function renderContributorLeaderboard() {
     var listEl = document.getElementById('communityContribList');
     if (!listEl) return;
 
-    var scores = {};
-    COMM_POSTS.forEach(function (p) {
-        if (!p.userId || p.userId === 'system') return;
-        if (!scores[p.userId]) scores[p.userId] = { userId: p.userId, name: p.userName || 'Student', posts: 0, comments: 0, helpful: 0, total: 0 };
-        scores[p.userId].posts += 1;
-        scores[p.userId].helpful += (p.reactions && p.reactions.helpful ? p.reactions.helpful.length : 0);
-        scores[p.userId].comments += (p.comments || []).filter(function (c) { return c.userId === p.userId; }).length;
-        scores[p.userId].name = p.userName || scores[p.userId].name;
-    });
-
-    var sorted = Object.values(scores).map(function (s) {
-        s.total = s.posts * 3 + s.helpful * 2 + s.comments;
-        return s;
-    }).sort(function (a, b) { return b.total - a.total; }).slice(0, 5);
+    var scores = getContributorMap();
+    var sorted = Object.values(scores).sort(function (a, b) { return b.total - a.total; }).slice(0, 5);
 
     if (!sorted.length) {
         listEl.innerHTML = '<p style="color:var(--text-secondary);margin:0;">No contributors yet. Create the first post!</p>';
@@ -476,9 +536,10 @@ function renderContributorLeaderboard() {
 
     var medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
     listEl.innerHTML = sorted.map(function (s, idx) {
+        var badge = s.total >= 100 ? ' <span style="font-size:0.75rem;color:var(--primary);font-weight:700;">Top Contributor</span>' : '';
         return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0;border-bottom:1px solid var(--border);">' +
-            '<div><strong>' + medals[idx] + ' ' + esc(s.name) + '</strong>' +
-            '<div style="font-size:0.85rem;color:var(--text-secondary);">Posts: ' + s.posts + ' • Helpful: ' + s.helpful + ' • Comments: ' + s.comments + '</div></div>' +
+            '<div><strong>' + medals[idx] + ' ' + esc(s.name) + '</strong>' + badge +
+            '<div style="font-size:0.85rem;color:var(--text-secondary);">Posts: ' + s.posts + ' • Helpful recognition: ' + s.helpfulRec + ' • Own comments: ' + s.comments + '</div></div>' +
             '<div style="font-weight:800;color:var(--primary);">' + s.total + ' pts</div>' +
             '</div>';
     }).join('');
@@ -487,14 +548,23 @@ function renderContributorLeaderboard() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function countReactions(post) {
     if (!post || !post.reactions) return 0;
-    return ['like', 'love', 'laugh', 'helpful'].reduce(function (sum, k) {
+    return ['like', 'love', 'laugh', 'dislike'].reduce(function (sum, k) {
         return sum + (Array.isArray(post.reactions[k]) ? post.reactions[k].length : 0);
     }, 0);
 }
 
+function myReactionProblem(post, userId) {
+    if (!post || !post.reactions) return null;
+    var keys = ['like', 'dislike'];
+    for (var i = 0; i < keys.length; i++) {
+        if (Array.isArray(post.reactions[keys[i]]) && post.reactions[keys[i]].indexOf(userId) !== -1) return keys[i];
+    }
+    return null;
+}
+
 function myReaction(post, userId) {
     if (!post || !post.reactions) return null;
-    var keys = ['like', 'love', 'laugh', 'helpful'];
+    var keys = ['like', 'love', 'laugh'];
     for (var i = 0; i < keys.length; i++) {
         if (Array.isArray(post.reactions[keys[i]]) && post.reactions[keys[i]].indexOf(userId) !== -1) return keys[i];
     }

@@ -14,6 +14,7 @@
         <aside class="sidebar">
             <div class="sidebar-logo">
                 <h2>Accoly</h2>
+                <p style="font-size: 0.75rem; margin: 0; color: var(--text-secondary);">Accoly Technologies</p>
             </div>
 
             <nav class="sidebar-nav">
@@ -21,13 +22,17 @@
                     <span class="nav-icon">📊</span>
                     <span>Dashboard</span>
                 </a>
+                <a href="notes.html" class="nav-item">
+                    <span class="nav-icon">📄</span>
+                    <span>PDF</span>
+                </a>
                 <a href="community.html" class="nav-item">
                     <span class="nav-icon">🧑‍🤝‍🧑</span>
                     <span>Community</span>
                 </a>
-                <a href="notes.html" class="nav-item">
-                    <span class="nav-icon">📝</span>
-                    <span>Notes</span>
+                <a href="quiz.html" class="nav-item active">
+                    <span class="nav-icon">🎮</span>
+                    <span>Quiz Center</span>
                 </a>
                 <a href="notepad.html" class="nav-item">
                     <span class="nav-icon">✏️</span>
@@ -36,10 +41,6 @@
                 <a href="flashcards.html" class="nav-item">
                     <span class="nav-icon">🧠</span>
                     <span>Flashcards</span>
-                </a>
-                <a href="quiz.html" class="nav-item active">
-                    <span class="nav-icon">🎮</span>
-                    <span>Quiz</span>
                 </a>
                 <a href="leaderboard.html" class="nav-item">
                     <span class="nav-icon">🏆</span>
@@ -105,7 +106,7 @@
                             <button onclick="filterQuizzes('Easy', event)" class="difficulty-btn">Easy</button>
                             <button onclick="filterQuizzes('Medium', event)" class="difficulty-btn">Medium</button>
                             <button onclick="filterQuizzes('Hard', event)" class="difficulty-btn">Hard</button>
-                            <button onclick="filterQuizzes('Super Hard', event)" class="difficulty-btn">Super Hard</button>
+                            <button onclick="filterQuizzes('Elite', event)" class="difficulty-btn">Elite</button>
                         </div>
                     </div>
 
@@ -191,9 +192,9 @@
                         </div>
 
                         <div class="card" style="margin-top:1rem;">
-                            <h3 style="margin-bottom:0.5rem;">Answer Explanations <span style="margin-left:0.35rem;">🔒</span></h3>
-                            <p style="margin-bottom:0.75rem;">Premium users can view detailed explanations per question.</p>
-                            <button type="button" class="btn btn-outline" id="btnShowExplanations" data-premium="true">Show explanations</button>
+                            <h3 style="margin-bottom:0.5rem;">Detailed explanations <span style="margin-left:0.35rem;">🔒</span></h3>
+                            <p style="margin-bottom:0.75rem;">Premium users can open a full breakdown for every question.</p>
+                            <button type="button" class="btn btn-outline" id="btnShowExplanations" data-premium="true">Show detailed explanations</button>
                             <div id="explanationsPanel" style="margin-top:0.75rem;"></div>
                         </div>
                     </div>

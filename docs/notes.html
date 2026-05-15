@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notes - Accoly</title>
+    <title>PDF - Accoly</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="dashboard.css">
     <link rel="stylesheet" href="modules.css">
@@ -13,14 +13,15 @@
         <aside class="sidebar">
             <div class="sidebar-logo">
                 <h2>Accoly</h2>
+                <p style="font-size: 0.75rem; margin: 0; color: var(--text-secondary);">Accoly Technologies</p>
             </div>
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="notes.html" class="nav-item active"><span class="nav-icon">📄</span><span>PDF</span></a>
                 <a href="community.html" class="nav-item"><span class="nav-icon">🧑‍🤝‍🧑</span><span>Community</span></a>
-                <a href="notes.html" class="nav-item active"><span class="nav-icon">📝</span><span>Notes</span></a>
+                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz Center</span></a>
                 <a href="notepad.html" class="nav-item"><span class="nav-icon">✏️</span><span>Notepad</span></a>
                 <a href="flashcards.html" class="nav-item"><span class="nav-icon">🧠</span><span>Flashcards</span></a>
-                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz</span></a>
                 <a href="leaderboard.html" class="nav-item"><span class="nav-icon">🏆</span><span>Leaderboard</span></a>
                 <a href="messages.html" class="nav-item"><span class="nav-icon">💬</span><span>Messages</span></a>
                 <a href="profile.html" class="nav-item"><span class="nav-icon">👤</span><span>Profile</span></a>
@@ -33,7 +34,7 @@
 
         <main class="dashboard-main">
             <header class="top-bar">
-                <h1 class="module-page-title">Notes</h1>
+                <h1 class="module-page-title">PDF</h1>
                 <div class="top-bar-right top-bar-actions">
                     <div class="dropdown-shell dropdown-shell--notif">
                         <button type="button" class="icon-btn nav-notif-btn" id="navNotifBtn" aria-label="Notifications" aria-expanded="false" aria-haspopup="true">🔔</button>
@@ -74,8 +75,6 @@
                                 <option value="name">Name A-Z</option>
                                 <option value="created">Upload date</option>
                             </select>
-                            <input type="file" id="pdfUploadInput" accept="application/pdf" hidden />
-                            <button type="button" id="btnUploadPdf" class="btn btn-primary">Upload PDF</button>
                         </div>
                         <div class="manager-grid">
                             <section class="card manager-section">

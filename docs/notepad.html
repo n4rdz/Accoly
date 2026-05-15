@@ -17,11 +17,11 @@
             </div>
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="notes.html" class="nav-item"><span class="nav-icon">📄</span><span>PDF</span></a>
                 <a href="community.html" class="nav-item"><span class="nav-icon">🧑‍🤝‍🧑</span><span>Community</span></a>
-                <a href="notes.html" class="nav-item"><span class="nav-icon">📝</span><span>Notes</span></a>
+                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz Center</span></a>
                 <a href="notepad.html" class="nav-item active"><span class="nav-icon">✏️</span><span>Notepad</span></a>
                 <a href="flashcards.html" class="nav-item"><span class="nav-icon">🧠</span><span>Flashcards</span></a>
-                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz</span></a>
                 <a href="leaderboard.html" class="nav-item"><span class="nav-icon">🏆</span><span>Leaderboard</span></a>
                 <a href="messages.html" class="nav-item"><span class="nav-icon">💬</span><span>Messages</span></a>
                 <a href="profile.html" class="nav-item"><span class="nav-icon">👤</span><span>Profile</span></a>
@@ -60,8 +60,19 @@
             </header>
 
             <div class="dashboard-content">
-                <div class="notepad-shell">
+                <div id="notepadShell" class="notepad-shell">
                     <div class="notepad-toolbar" aria-label="Drawing tools">
+                        <div class="tool-group">
+                            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.25rem;">Subject</span>
+                            <select id="notepadSubjectSelect" class="sort-select" aria-label="Notepad subject" style="min-width: 10rem;">
+                                <option value="General">General</option>
+                                <option value="Financial Accounting">Financial Accounting</option>
+                                <option value="Cost Accounting">Cost Accounting</option>
+                                <option value="Auditing">Auditing</option>
+                                <option value="Taxation">Taxation</option>
+                                <option value="Business Law">Business Law</option>
+                            </select>
+                        </div>
                         <div class="tool-group">
                             <span style="font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.25rem;">Tools</span>
                             <button type="button" class="tool-btn active" data-tool="pencil">Pencil</button>
@@ -92,6 +103,11 @@
                         <div class="tool-group">
                             <button type="button" class="tool-btn" id="btnUndo" title="Undo">Undo</button>
                             <button type="button" class="tool-btn" id="btnRedo" title="Redo">Redo</button>
+                        </div>
+                        <div class="tool-group">
+                            <input type="file" id="notepadUploadInput" accept="image/*" hidden />
+                            <button type="button" class="btn btn-outline" id="btnUploadNotepad" style="padding:0.35rem 0.65rem;font-size:0.85rem;">Upload note</button>
+                            <button type="button" class="btn btn-outline" id="btnNotepadFullscreen" style="padding:0.35rem 0.65rem;font-size:0.85rem;">Full canvas</button>
                         </div>
                     </div>
 

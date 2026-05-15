@@ -1510,3 +1510,23 @@
         height: 360px;
     }
 }
+
+/* Notepad: full-canvas mode (sidebar stays in DOM; main area expands) */
+.notepad-shell.notepad-shell--fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    background: var(--background, #fff);
+    padding: 0.75rem;
+    overflow: auto;
+    box-shadow: 0 0 0 1px var(--border);
+}
+
+body.notepad-fullscreen-canvas .dashboard-wrapper > .sidebar {
+    display: none !important;
+}
+
+body.notepad-fullscreen-canvas .dashboard-wrapper > .dashboard-main {
+    width: 100%;
+    max-width: 100%;
+}

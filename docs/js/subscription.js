@@ -85,7 +85,8 @@
             '<div class="upgrade-modal-benefits">' +
             '<div class="upgrade-pill">Unlimited flashcards</div>' +
             '<div class="upgrade-pill">Offline quizzes</div>' +
-            '<div class="upgrade-pill">Advanced analytics</div>' +
+            '<div class="upgrade-pill">Detailed quiz explanations</div>' +
+            '<div class="upgrade-pill">Group chat</div>' +
             '<div class="upgrade-pill">Anonymous posting</div>' +
             '</div>' +
             '</div>' +

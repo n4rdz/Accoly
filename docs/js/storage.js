@@ -415,7 +415,7 @@ const Storage = {
         if (quizAttempt.difficulty === 'Easy') baseXP = 50;
         if (quizAttempt.difficulty === 'Medium' || quizAttempt.difficulty === 'Intermediate') baseXP = 100;
         if (quizAttempt.difficulty === 'Hard') baseXP = 200;
-        if (quizAttempt.difficulty === 'Super Hard') baseXP = 300;
+        if (quizAttempt.difficulty === 'Elite' || quizAttempt.difficulty === 'Super Hard') baseXP = 300;
 
         // Bonus for accuracy
         const accuracy = (quizAttempt.correctAnswers / quizAttempt.totalQuestions) * 100;
@@ -603,9 +603,9 @@ const Storage = {
         // Back-compat: older post shape used attachment / anonymous / { like, dislike, emojis:{} }
         // We keep unknown keys, but normalize reactions/comments for Community V2.
         var rx = p.reactions || {};
-        var v2 = { like: [], love: [], laugh: [], helpful: [] };
+        var v2 = { like: [], love: [], laugh: [], helpful: [], dislike: [] };
         // If already V2 arrays, keep.
-        ['like', 'love', 'laugh', 'helpful'].forEach(function (k) {
+        ['like', 'love', 'laugh', 'helpful', 'dislike'].forEach(function (k) {
             if (Array.isArray(rx[k])) v2[k] = rx[k].filter(Boolean);
         });
         // If legacy numeric counts exist, preserve them as "legacy tokens" so totals don't drop.
@@ -613,8 +613,7 @@ const Storage = {
             for (var i = 0; i < rx.like; i++) v2.like.push('legacy-like-' + i);
         }
         if (typeof rx.dislike === 'number') {
-            // Legacy had dislikes; we drop dislike semantics but preserve as "laugh" tokens to keep engagement totals stable.
-            for (var j = 0; j < rx.dislike; j++) v2.laugh.push('legacy-dislike-' + j);
+            for (var j = 0; j < rx.dislike; j++) v2.dislike.push('legacy-dislike-' + j);
         }
         if (rx.emojis && typeof rx.emojis === 'object') {
             // Map old emoji counts into closest V2 reaction buckets.
@@ -629,6 +628,7 @@ const Storage = {
             });
         }
         p.reactions = v2;
+        p.isAnonymous = !!(p.isAnonymous || p.anonymous);
 
         // Comments
         if (!Array.isArray(p.comments)) p.comments = [];

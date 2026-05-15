@@ -14,6 +14,7 @@
         <aside class="sidebar">
             <div class="sidebar-logo">
                 <h2>Accoly</h2>
+                <p style="font-size: 0.75rem; margin: 0; color: var(--text-secondary);">Accoly Technologies</p>
             </div>
 
             <nav class="sidebar-nav">
@@ -21,13 +22,17 @@
                     <span class="nav-icon">📊</span>
                     <span>Dashboard</span>
                 </a>
+                <a href="notes.html" class="nav-item">
+                    <span class="nav-icon">📄</span>
+                    <span>PDF</span>
+                </a>
                 <a href="community.html" class="nav-item">
                     <span class="nav-icon">🧑‍🤝‍🧑</span>
                     <span>Community</span>
                 </a>
-                <a href="notes.html" class="nav-item">
-                    <span class="nav-icon">📝</span>
-                    <span>Notes</span>
+                <a href="quiz.html" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>Quiz Center</span>
                 </a>
                 <a href="notepad.html" class="nav-item">
                     <span class="nav-icon">✏️</span>
@@ -36,10 +41,6 @@
                 <a href="flashcards.html" class="nav-item">
                     <span class="nav-icon">🧠</span>
                     <span>Flashcards</span>
-                </a>
-                <a href="quiz.html" class="nav-item">
-                    <span class="nav-icon">🎮</span>
-                    <span>Quiz</span>
                 </a>
                 <a href="leaderboard.html" class="nav-item">
                     <span class="nav-icon">🏆</span>
@@ -99,7 +100,10 @@
                 <div class="profile-header">
                     <div class="profile-avatar-large" id="profileAvatar"></div>
                     <div class="profile-info">
-                        <h1 id="profileName"></h1>
+                        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.35rem;">
+                            <h1 id="profileName" style="margin:0;"></h1>
+                            <span id="profileStreakBadge" style="font-size:0.9rem;font-weight:700;padding:0.2rem 0.55rem;border-radius:999px;background:rgba(234,88,12,0.12);color:#c2410c;border:1px solid rgba(234,88,12,0.35);"></span>
+                        </div>
                         <p id="profileEmail"></p>
                         <p id="profilePlanBadge"></p>
                         <p id="profileJoinedDate"></p>
@@ -107,8 +111,15 @@
                     </div>
                 </div>
 
-                <!-- Stats Grid -->
-                <div class="stats-grid">
+                <div class="profile-section" id="profileSubjectRatingsSection">
+                    <h2>Subject ratings</h2>
+                    <p style="color:var(--text-secondary);font-size:0.9rem;margin-top:0;">Average quiz score by subject (from your attempts).</p>
+                    <div id="profileSubjectRatings" style="margin-top:0.75rem;"></div>
+                </div>
+
+                <div class="profile-section">
+                    <h2>Learning</h2>
+                    <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon">📈</div>
                         <div class="stat-info">
@@ -130,33 +141,33 @@
                             <p class="stat-value" id="profileXP">0</p>
                         </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">🔥</div>
-                        <div class="stat-info">
-                            <p class="stat-label">Streak</p>
-                            <p class="stat-value" id="profileStreak">0d</p>
-                        </div>
                     </div>
+                </div>
+
+                <div class="profile-section">
+                    <h2>Library</h2>
+                    <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon">📝</div>
                         <div class="stat-info">
-                            <p class="stat-label">Notes Created</p>
+                            <p class="stat-label">PDFs / notes</p>
                             <p class="stat-value" id="profileNotesCount">0</p>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">✏️</div>
                         <div class="stat-info">
-                            <p class="stat-label">Notepad Pages</p>
+                            <p class="stat-label">Notepad pages</p>
                             <p class="stat-value" id="profileNotepadCount">0</p>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">👍</div>
                         <div class="stat-info">
-                            <p class="stat-label">Likes Received</p>
+                            <p class="stat-label">Likes received</p>
                             <p class="stat-value" id="profileLikesReceived">0</p>
                         </div>
+                    </div>
                     </div>
                 </div>
 
@@ -219,7 +230,7 @@
                     <div id="recentQuizzes" style="display: flex; flex-direction: column; gap: 1rem;"></div>
                 </div>
                 <div class="profile-section">
-                    <h2>Study Trend</h2>
+                    <h2>Study Habits</h2>
                     <canvas id="studyChart" width="700" height="220" style="width:100%;max-width:100%;background:var(--background);border:1px solid var(--border);border-radius:var(--radius-lg);"></canvas>
                 </div>
                 <div class="profile-section">

@@ -55,7 +55,7 @@ const QUIZ_MODULES = [
         id: 7,
         name: 'Management Advisory Services',
         subject: 'MAS',
-        difficulty: 'Super Hard',
+        difficulty: 'Elite',
         color: 'from-indigo-500 to-indigo-600',
         icon: '💼'
     }

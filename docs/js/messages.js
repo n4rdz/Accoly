@@ -1,5 +1,9 @@
 var MSG = { activeUserId: null, activeGroupId: null };
 
+function msgPremium() {
+    return window.AccolySubscription && AccolySubscription.isPremiumUser();
+}
+
 // In-memory caches
 var MSG_ALL_USERS = [];
 var MSG_CONVO_CACHE = [];
@@ -125,6 +129,10 @@ function openChat(otherUserId) {
 }
 
 function openGroup(groupId) {
+    if (!msgPremium()) {
+        checkPremiumAccess('Group chat');
+        return;
+    }
     MSG.activeGroupId = groupId;
     MSG.activeUserId = null;
     var groups = Storage.getGroups();
@@ -145,6 +153,10 @@ function renderChat() {
     }
 
     if (MSG.activeGroupId) {
+        if (!msgPremium()) {
+            AccountifyUI.toast('Group chat requires Premium', 'warning');
+            return;
+        }
         var convo = Storage.getGroupConversation(MSG.activeGroupId);
         renderMessages(chat, convo, me.id);
         return;
@@ -193,6 +205,10 @@ function renderGroupList() {
     var me = Storage.getCurrentUser();
     var listEl = document.getElementById('groupList');
     if (!listEl) return;
+    if (!msgPremium()) {
+        listEl.innerHTML = '<p style="color:var(--text-secondary);margin:0;">Group chat is Premium. Upgrade to join or create study groups.</p>';
+        return;
+    }
     var groups = Storage.getGroups().filter(function (g) {
         return Array.isArray(g.memberIds) && g.memberIds.indexOf(me.id) !== -1;
     });
@@ -234,6 +250,11 @@ function sendMessage() {
     sendBtn.disabled = true;
 
     if (MSG.activeGroupId) {
+        if (!msgPremium()) {
+            input.disabled = false;
+            sendBtn.disabled = false;
+            return;
+        }
         try {
             Storage.saveGroupMessage({ groupId: MSG.activeGroupId, fromUserId: me.id, body: body });
             input.value = '';
@@ -279,6 +300,7 @@ function sendMessage() {
 
 function bindPremiumLocks() {
     var btn = document.getElementById('btnPremiumGroup');
+    if (!btn) return;
     btn.setAttribute('data-premium', 'true');
     btn.addEventListener('click', function () {
         if (!checkPremiumAccess('Group chat creation')) return;

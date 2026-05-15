@@ -299,6 +299,8 @@ export default function SettingsPage() {
               <Button className="bg-primary text-white">Contact Support</Button>
             </div>
           </div>
+
+          <p className="text-center text-xs text-muted-foreground pt-2">Accoly Technologies</p>
         </div>
       </div>
     </div>

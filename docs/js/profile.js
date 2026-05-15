@@ -36,7 +36,10 @@ function loadProfile() {
     if (avatarEl) avatarEl.textContent = initials;
     
     var nameEl = document.getElementById('profileName');
-    if (nameEl) nameEl.textContent = esc(user.fullName || 'User');
+    if (nameEl) nameEl.textContent = user.fullName || 'User';
+
+    var streakBadge = document.getElementById('profileStreakBadge');
+    if (streakBadge) streakBadge.textContent = '🔥 ' + (stats.currentStreak || 0) + 'd';
     
     var emailEl = document.getElementById('profileEmail');
     if (emailEl) emailEl.textContent = esc(user.email || '');
@@ -89,9 +92,8 @@ function loadProfile() {
     document.getElementById('profileAccuracy').textContent = stats.accuracyPercentage + '%';
     document.getElementById('profileQuizzes').textContent = stats.totalQuizzes;
     document.getElementById('profileXP').textContent = stats.totalXP;
-    document.getElementById('profileStreak').textContent = (stats.currentStreak || 0) + 'd';
 
-    var notesCount = Storage.getNotes(user.id).length;
+    var notesCount = Storage.getPdfMetaList(user.id).length;
     var notepadCount = Storage.getNotepadEntries(user.id).length;
     var notesEl = document.getElementById('profileNotesCount');
     var padEl = document.getElementById('profileNotepadCount');
@@ -105,6 +107,42 @@ function loadProfile() {
     loadRecentQuizzes(user.id);
     renderStudyChart(user.id);
     renderStudyCalendar(user.id);
+    renderSubjectRatings(user.id);
+}
+
+function renderSubjectRatings(userId) {
+    var el = document.getElementById('profileSubjectRatings');
+    if (!el) return;
+    var attempts = Storage.getQuizAttempts(userId);
+    var map = {};
+    attempts.forEach(function (a) {
+        var s = a.subject || 'General';
+        if (!map[s]) map[s] = { sum: 0, n: 0 };
+        map[s].sum += typeof a.score === 'number' ? a.score : 0;
+        map[s].n += 1;
+    });
+    var keys = Object.keys(map);
+    if (!keys.length) {
+        el.innerHTML = '<p style="color: var(--text-secondary); margin: 0;">Take quizzes to see subject ratings.</p>';
+        return;
+    }
+    keys.sort();
+    el.innerHTML =
+        '<div class="card" style="padding:0;">' +
+        keys
+            .map(function (s) {
+                var avg = Math.round(map[s].sum / map[s].n);
+                return (
+                    '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 1rem;border-bottom:1px solid var(--border);">' +
+                    '<span>' +
+                    esc(s) +
+                    '</span><strong>' +
+                    avg +
+                    '% avg</strong></div>'
+                );
+            })
+            .join('') +
+        '</div>';
 }
 
 function calculateLikesReceived(userId) {
@@ -112,7 +150,8 @@ function calculateLikesReceived(userId) {
     var total = 0;
     posts.forEach(function (p) {
         if (p.userId !== userId) return;
-        if (p.reactions && typeof p.reactions.like === 'number') total += p.reactions.like;
+        if (p.reactions && Array.isArray(p.reactions.like)) total += p.reactions.like.length;
+        else if (p.reactions && typeof p.reactions.like === 'number') total += p.reactions.like;
         if (p.reactions && p.reactions.emojis) {
             Object.keys(p.reactions.emojis).forEach(function (k) {
                 total += p.reactions.emojis[k] || 0;
@@ -142,7 +181,7 @@ function loadRecentQuizzes(userId) {
             <div class="quiz-item">
                 <div class="quiz-item-info">
                     <h4>${esc(attempt.subject || 'Unknown')}</h4>
-                    <p class="quiz-item-date">${dateStr} • ${esc(attempt.difficulty || 'Unknown')}</p>
+                    <p class="quiz-item-date">${dateStr} • ${esc((attempt.difficulty || 'Unknown').replace('Super Hard', 'Elite'))}</p>
                 </div>
                 <div class="quiz-item-score">
                     <div class="quiz-item-score-value">${(attempt.score || 0)}%</div>

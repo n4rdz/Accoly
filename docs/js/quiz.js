@@ -27,6 +27,18 @@ function initQuizCenter() {
     loadQuizModules();
 }
 
+function getTimeLimitByDifficulty(level) {
+    if (level === 'Easy') return 10 * 60;
+    if (level === 'Medium') return 18 * 60;
+    if (level === 'Hard') return 22 * 60;
+    return 30 * 60;
+}
+
+function formatQuizMinutes(level) {
+    var sec = getTimeLimitByDifficulty(level);
+    return Math.round(sec / 60) + ' min';
+}
+
 // HTML escaping utility
 function esc(s) {
     var d = document.createElement('div');
@@ -54,14 +66,14 @@ function loadQuizModules() {
                 </div>
                 <div class="module-stat">
                     <span class="module-stat-label">Time Limit</span>
-                    <span class="module-stat-value">30 min</span>
+                    <span class="module-stat-value">${formatQuizMinutes(module.difficulty)}</span>
                 </div>
                 <div class="module-stat">
                     <span class="module-stat-label">Difficulty</span>
                     <span class="module-stat-value">${esc(module.difficulty)}</span>
                 </div>
-                <button onclick="startQuiz(${module.id})" class="btn btn-primary" ${(!premium && module.difficulty === 'Super Hard') ? 'data-premium="true" disabled aria-disabled="true"' : ''}>
-                    ${(!premium && module.difficulty === 'Super Hard') ? '🔒 Start Quiz' : 'Start Quiz'}
+                <button onclick="startQuiz(${module.id})" class="btn btn-primary" ${(!premium && module.difficulty === 'Elite') ? 'data-premium="true" disabled aria-disabled="true"' : ''}>
+                    ${(!premium && module.difficulty === 'Elite') ? '🔒 Start Quiz' : 'Start Quiz'}
                 </button>
             </div>
         </div>
@@ -97,7 +109,7 @@ function filterQuizzes(difficulty, evt) {
                     </div>
                     <div class="module-stat">
                         <span class="module-stat-label">Time Limit</span>
-                        <span class="module-stat-value">30 min</span>
+                        <span class="module-stat-value">${formatQuizMinutes(module.difficulty)}</span>
                     </div>
                     <div class="module-stat">
                         <span class="module-stat-label">Difficulty</span>
@@ -119,8 +131,8 @@ function startQuiz(moduleId) {
     }
 
     currentQuizModule = QUIZ_MODULES.find(m => m.id === moduleId);
-    if (currentQuizModule && currentQuizModule.difficulty === 'Super Hard') {
-        if (!checkPremiumAccess('Super Hard quizzes')) return;
+    if (currentQuizModule && currentQuizModule.difficulty === 'Elite') {
+        if (!checkPremiumAccess('Elite quizzes')) return;
     }
     currentQuestions = QUIZ_QUESTIONS[moduleId];
     
@@ -143,13 +155,6 @@ function startQuiz(moduleId) {
 
     // Start timer
     startTimer();
-}
-
-function getTimeLimitByDifficulty(level) {
-    if (level === 'Easy') return 15 * 60;
-    if (level === 'Medium') return 20 * 60;
-    if (level === 'Hard') return 25 * 60;
-    return 30 * 60;
 }
 
 function startTimer() {
@@ -363,7 +368,7 @@ function showResults(score, correctCount, timeTaken, xpEarned) {
     if (panel) panel.innerHTML = '';
     if (btnExplain) {
         btnExplain.onclick = function () {
-            if (!checkPremiumAccess('Advanced quiz explanations')) return;
+            if (!checkPremiumAccess('Detailed quiz explanations')) return;
             renderExplanations();
         };
     }

@@ -17,11 +17,11 @@
             </div>
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="notes.html" class="nav-item"><span class="nav-icon">📄</span><span>PDF</span></a>
                 <a href="community.html" class="nav-item active"><span class="nav-icon">🧑‍🤝‍🧑</span><span>Community</span></a>
-                <a href="notes.html" class="nav-item"><span class="nav-icon">📝</span><span>Notes</span></a>
+                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz Center</span></a>
                 <a href="notepad.html" class="nav-item"><span class="nav-icon">✏️</span><span>Notepad</span></a>
                 <a href="flashcards.html" class="nav-item"><span class="nav-icon">🧠</span><span>Flashcards</span></a>
-                <a href="quiz.html" class="nav-item"><span class="nav-icon">🎮</span><span>Quiz</span></a>
                 <a href="leaderboard.html" class="nav-item"><span class="nav-icon">🏆</span><span>Leaderboard</span></a>
                 <a href="messages.html" class="nav-item"><span class="nav-icon">💬</span><span>Messages</span></a>
                 <a href="profile.html" class="nav-item"><span class="nav-icon">👤</span><span>Profile</span></a>
@@ -88,7 +88,7 @@
 
                 <section class="card" style="margin-bottom: 1rem;">
                     <h3 style="margin-bottom:0.5rem;">Contributor leaderboard</h3>
-                    <p style="margin-bottom:0.75rem;">Top contributors based on posts and helpful reactions.</p>
+                    <p style="margin-bottom:0.75rem;">Top contributors by posts, helpful recognition on problems (likes), and your own comments on your posts. Earn the Top Contributor tag at 100+ pts.</p>
                     <div id="communityContribList"></div>
                 </section>
 
@@ -124,6 +124,12 @@
                         <input id="postModalTags" type="text" class="form-input" placeholder="e.g. Taxation, exam-tip" />
                         <p style="font-size:0.8rem; color: var(--text-secondary); margin-top: 0.35rem;">Tip: include at least one subject tag.</p>
                     </div>
+                </div>
+                <div id="postModalAnonymousRow" class="form-group" style="margin-top:0.75rem;display:none;">
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                        <input type="checkbox" id="postModalAnonymous" />
+                        <span>Post anonymously <span style="color:var(--text-secondary);font-size:0.85rem;">(Premium)</span></span>
+                    </label>
                 </div>
             </div>
             <div class="modal-footer">

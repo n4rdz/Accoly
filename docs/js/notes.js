@@ -78,8 +78,10 @@ function bindManagerEvents() {
     var uploadInput = document.getElementById('pdfUploadInput');
     search.addEventListener('input', function () { ManagerState.search = search.value.trim().toLowerCase(); renderPdfLibrary(); });
     sort.addEventListener('change', function () { ManagerState.sort = sort.value; renderPdfLibrary(); });
-    uploadBtn.addEventListener('click', function () { uploadInput.value = ''; uploadInput.click(); });
-    uploadInput.addEventListener('change', function () { var f = uploadInput.files && uploadInput.files[0]; if (f) uploadPdf(f); });
+    if (uploadBtn && uploadInput) {
+        uploadBtn.addEventListener('click', function () { uploadInput.value = ''; uploadInput.click(); });
+        uploadInput.addEventListener('change', function () { var f = uploadInput.files && uploadInput.files[0]; if (f) uploadPdf(f); });
+    }
 }
 
 async function uploadPdf(file) {

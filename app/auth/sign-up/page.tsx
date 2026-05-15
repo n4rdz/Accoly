@@ -73,6 +73,7 @@ export default function Page() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Accountify</h1>
           <p className="text-gray-600 mt-2">Join Future Accountants</p>
+          <p className="text-gray-500 text-sm mt-1">Accoly Technologies</p>
         </div>
 
         {/* Sign Up Card */}
@@ -185,7 +186,7 @@ export default function Page() {
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-500 mt-6">
-          Built for Future CPAs &amp; Accountants
+          Accoly Technologies · Built for Future CPAs &amp; Accountants
         </p>
       </div>
     </div>

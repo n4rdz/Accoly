@@ -112,7 +112,7 @@ export default function NotesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">My Notes</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">PDF</h1>
           <p className="text-muted-foreground mt-2">Organize and study from your personal notes</p>
         </div>
         <Button className="bg-gradient-to-r from-primary to-secondary text-white font-semibold h-11">

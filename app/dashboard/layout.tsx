@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   BookOpen,
   Target,
-  BookMarked,
   FileText,
   TrendingUp,
   User,
@@ -18,15 +17,16 @@ import {
   X,
   Bell,
   Search,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 const navigationItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-  { icon: BookOpen, label: 'Notes', href: '/dashboard/notes' },
+  { icon: BookOpen, label: 'PDF', href: '/dashboard/notes' },
+  { icon: Users, label: 'Community', href: '/dashboard/standards' },
   { icon: Target, label: 'Quiz Center', href: '/dashboard/quiz' },
-  { icon: BookMarked, label: 'Standards Library', href: '/dashboard/standards' },
   { icon: FileText, label: 'Notepad', href: '/dashboard/notepad' },
   { icon: TrendingUp, label: 'Leaderboard', href: '/dashboard/leaderboard' },
 ];

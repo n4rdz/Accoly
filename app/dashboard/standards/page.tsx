@@ -131,7 +131,10 @@ export default function StandardsLibraryPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Standards Library</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Community</h1>
+          <p className="text-muted-foreground mt-2 max-w-xl">
+            Shared standards and study resources (this section maps to Community in the app menu).
+          </p>
           <p className="text-muted-foreground mt-2">
             Access updated accounting standards, regulations, and study materials
           </p>

@@ -180,10 +180,15 @@ const SupabaseClient = {
         const { data, error } = await _sb.from('posts').select('*').order('created_at', { ascending: false });
         if (error || !data) return [];
         return data.map(function (p) {
+            var rx = p.reactions || { like: [], love: [], laugh: [], helpful: [], dislike: [] };
+            ['like', 'love', 'laugh', 'helpful', 'dislike'].forEach(function (k) {
+                if (!Array.isArray(rx[k])) rx[k] = [];
+            });
             return {
                 id: p.id, userId: p.user_id, userName: p.user_name, content: p.content,
-                type: p.type, tags: p.tags || [], reactions: p.reactions || { like: [], love: [], laugh: [], helpful: [] },
-                comments: p.comments || [], createdAt: p.created_at, updatedAt: p.updated_at
+                type: p.type, tags: p.tags || [], reactions: rx,
+                comments: p.comments || [], createdAt: p.created_at, updatedAt: p.updated_at,
+                isAnonymous: !!(p.is_anonymous || (p.user_name === 'Anonymous' && p.user_id && p.user_id !== 'system'))
             };
         });
     },
@@ -192,7 +197,7 @@ const SupabaseClient = {
         const row = {
             user_id: post.userId, user_name: post.userName, content: post.content,
             type: post.type || 'Discussion', tags: post.tags || [],
-            reactions: post.reactions || { like: [], love: [], laugh: [], helpful: [] },
+            reactions: post.reactions || { like: [], love: [], laugh: [], helpful: [], dislike: [] },
             comments: post.comments || [], updated_at: new Date().toISOString()
         };
         if (post.id) row.id = post.id;
