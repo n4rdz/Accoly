@@ -49,7 +49,24 @@ function initNotepad() {
     bindToolbars();
     bindNotepadExtras();
     bindCanvasEvents();
-    renderSavedList();
+    // Set currentSubject from dropdown immediately
+    var _subSel = document.getElementById('notepadSubjectSelect');
+    if (_subSel && _subSel.value) NP.currentSubject = _subSel.value;
+    if (!NP.currentSubject) NP.currentSubject = 'FAR';
+    // Render saved list after auth session is established
+    setTimeout(function() {
+        var _s = document.getElementById('notepadSubjectSelect');
+        if (_s && _s.value) NP.currentSubject = _s.value;
+        renderSavedList();
+        setTimeout(function() {
+            var container = document.getElementById('savedList');
+            if (container && container.querySelector('p')) {
+                var _s2 = document.getElementById('notepadSubjectSelect');
+                if (_s2 && _s2.value) NP.currentSubject = _s2.value;
+                renderSavedList();
+            }
+        }, 2000);
+    }, 500);
 
     window.addEventListener('resize', scheduleResizeCanvas);
     scheduleResizeCanvas();
@@ -496,7 +513,7 @@ function renderSavedList() {
     if (!NP.currentSubject) { var _sel = document.getElementById('notepadSubjectSelect'); NP.currentSubject = (_sel && _sel.value) || 'FAR'; }
     var sub = NP.currentSubject;
     var container = document.getElementById('savedList');
-    if (!container || !user) return;
+    if (!container || !user) { console.warn('[Notepad] renderSavedList early exit — container:', !!container, 'user:', !!user); return; }
 
     container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Loading...</p>';
 
@@ -529,12 +546,14 @@ function renderSavedList() {
 
             container.innerHTML = '';
             list.forEach(function (entry) {
-                appendSavedListItem(container, entry);
+                try { appendSavedListItem(container, entry); } catch(e) { console.error('[Notepad] appendSavedListItem error:', e); }
             });
         })
         .catch(function (err) {
-            console.error('[Notepad] getNotepadEntries failed:', err);
-            container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
+            console.error('[Notepad] renderSavedList error:', err);
+            if (!container.children.length) {
+                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
+            }
         });
 }
 
