@@ -493,167 +493,138 @@ function exportPng() {
 
 function renderSavedList() {
     var user = Storage.getCurrentUser();
-    if (!user) {
-        console.error('[Notepad] No user found');
+    if (!NP.currentSubject) { var _sel = document.getElementById('notepadSubjectSelect'); NP.currentSubject = (_sel && _sel.value) || 'FAR'; }
+    var sub = NP.currentSubject;
+    var container = document.getElementById('savedList');
+    if (!container || !user) return;
+
+    container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Loading...</p>';
+
+    if (!window.SupabaseClient || !SupabaseClient.getNotepadEntries) {
+        container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
         return;
     }
 
-    if (!NP.currentSubject) { 
-        var _sel = document.getElementById('notepadSubjectSelect'); 
-        NP.currentSubject = (_sel && _sel.value) || 'AUD'; 
-    }
+    SupabaseClient.getNotepadEntries(user.id)
+        .then(function (entries) {
+            var normalizeCode = function (code) {
+                try {
+                    if (window.AccolyStats && typeof AccolyStats.normalizeSubjectCode === 'function') {
+                        return AccolyStats.normalizeSubjectCode(code);
+                    }
+                } catch (_) {}
+                return (code || 'FAR').toUpperCase().trim();
+            };
+            var normalizedSub = normalizeCode(sub);
+            var list = (entries || []).filter(function (e) {
+                return normalizeCode(e.subject) === normalizedSub;
+            }).sort(function (a, b) {
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            });
 
-    var container = document.getElementById('savedList');
-    if (!container) return;
-
-    container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Loading saved pages...</p>';
-
-    // Fetch from Supabase - correct table name
-    window.supabase
-        .from('notepad_entries')
-        .select('id, subject, image_data, preview_data_url, created_at, user_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .then(function (response) {
-            console.log('[Notepad] Supabase response:', response);
-
-            if (response.error) {
-                console.error('[Notepad] Supabase error:', response.error);
-                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Error: ' + response.error.message + '</p>';
-                return;
-            }
-
-            var entries = response.data || [];
-            console.log('[Notepad] Fetched entries:', entries.length);
-
-            if (entries.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet. Create a new canvas!</p>';
+            if (list.length === 0) {
+                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet.</p>';
                 return;
             }
 
             container.innerHTML = '';
-
-            entries.forEach(function (entry) {
-                console.log('[Notepad] Processing entry:', entry.id, entry.subject);
+            list.forEach(function (entry) {
                 appendSavedListItem(container, entry);
             });
         })
         .catch(function (err) {
-            console.error('[Notepad] Exception during fetch:', err);
-            container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Failed to load pages: ' + err.message + '</p>';
+            console.error('[Notepad] getNotepadEntries failed:', err);
+            container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
         });
 }
 
 function appendSavedListItem(container, entry) {
-    var div = document.createElement('div');
-    div.className = 'saved-item' + (entry.id === NP.currentEntryId ? ' active' : '');
-    div.dataset.id = entry.id;
-    div.style.marginBottom = '0.75rem';
-    div.style.padding = '0.5rem';
-    div.style.border = '1px solid var(--border-color)';
-    div.style.borderRadius = '0.5rem';
+        var div = document.createElement('div');
+        div.className = 'saved-item' + (entry.id === NP.currentEntryId ? ' active' : '');
+        div.dataset.id = entry.id;
 
-    var img = document.createElement('img');
-    img.className = 'saved-thumb';
-    img.src = entry.preview_data_url || entry.image_data || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60"><rect fill="%23f0f0f0" width="100" height="60"/></svg>';
-    img.alt = 'Saved drawing';
-    img.style.width = '100%';
-    img.style.height = '60px';
-    img.style.objectFit = 'cover';
-    img.style.borderRadius = '0.25rem';
-    img.style.marginBottom = '0.5rem';
+        var img = document.createElement('img');
+        img.className = 'saved-thumb';
+        img.src = entry.previewDataUrl || entry.imageData;
+        img.alt = 'Saved drawing';
 
-    var title = document.createElement('div');
-    title.textContent = (entry.subject || 'Untitled');
-    title.style.fontSize = '0.85rem';
-    title.style.fontWeight = 'bold';
-    title.style.marginBottom = '0.25rem';
+        var small = document.createElement('small');
+        small.textContent = new Date(entry.createdAt).toLocaleString();
 
-    var small = document.createElement('small');
-    var dateStr = entry.created_at;
-    small.textContent = new Date(dateStr).toLocaleString();
-    small.style.color = 'var(--text-secondary)';
-    small.style.fontSize = '0.75rem';
+        var row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '0.35rem';
+        row.style.marginTop = '0.35rem';
 
-    var row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.gap = '0.35rem';
-    row.style.marginTop = '0.5rem';
+        var loadBtn = document.createElement('button');
+        loadBtn.type = 'button';
+        loadBtn.className = 'btn btn-outline';
+        loadBtn.style.flex = '1';
+        loadBtn.style.padding = '0.25rem';
+        loadBtn.style.fontSize = '0.75rem';
+        loadBtn.textContent = 'Load';
 
-    var loadBtn = document.createElement('button');
-    loadBtn.type = 'button';
-    loadBtn.className = 'btn btn-outline';
-    loadBtn.style.flex = '1';
-    loadBtn.style.padding = '0.35rem';
-    loadBtn.style.fontSize = '0.75rem';
-    loadBtn.textContent = 'Load';
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'btn btn-outline';
+        delBtn.style.padding = '0.25rem';
+        delBtn.style.fontSize = '0.75rem';
+        delBtn.textContent = 'Del';
 
-    var delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.className = 'btn btn-outline';
-    delBtn.style.padding = '0.35rem';
-    delBtn.style.fontSize = '0.75rem';
-    delBtn.textContent = 'Del';
+        loadBtn.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            loadEntry(entry);
+        });
 
-    loadBtn.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        console.log('[Notepad] Loading entry:', entry.id);
-        loadEntry(entry);
-    });
-
-    delBtn.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        if (confirm('Delete this saved page?')) {
-            console.log('[Notepad] Deleting entry:', entry.id);
-            window.supabase
-                .from('notepad_entries')
-                .delete()
-                .eq('id', entry.id)
-                .then(function (response) {
-                    console.log('[Notepad] Delete response:', response);
-                    if (response.error) {
-                        console.error('[Notepad] Delete error:', response.error);
-                        return;
-                    }
+        delBtn.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            AccountifyUI.confirmDelete('Delete this saved page?').then(function (ok) {
+                if (!ok) return;
+                SupabaseClient.deleteNotepadEntry(entry.id).then(function () {
                     if (NP.currentEntryId === entry.id) NP.currentEntryId = null;
+                    AccountifyUI.toast('Page deleted', 'success');
                     renderSavedList();
                 });
-        }
-    });
+            });
+        });
 
-    div.appendChild(img);
-    div.appendChild(title);
-    div.appendChild(small);
-    row.appendChild(loadBtn);
-    row.appendChild(delBtn);
-    div.appendChild(row);
+        div.appendChild(img);
+        div.appendChild(small);
+        row.appendChild(loadBtn);
+        row.appendChild(delBtn);
+        div.appendChild(row);
 
-    container.appendChild(div);
+        div.addEventListener('click', function () {
+            loadEntry(entry);
+        });
+
+        container.appendChild(div);
 }
 
 function loadEntry(entry) {
-    if (!entry || !entry.image_data) {
-        console.error('[Notepad] Invalid entry:', entry);
-        alert('Cannot load this entry');
-        return;
-    }
-    
-    console.log('[Notepad] Loading canvas from entry:', entry.id);
     var img = new Image();
     img.onload = function () {
+        NP.bgType = entry.bgType || 'white';
+        var bgSel = document.getElementById('bgSelect');
+        if (bgSel) bgSel.value = NP.bgType;
+        var sub = document.getElementById('notepadSubjectSelect');
+        var entryCode = window.AccolyStats
+            ? AccolyStats.normalizeSubjectCode(entry.subject)
+            : entry.subject || 'FAR';
+        if (sub) sub.value = entryCode;
+        NP.currentSubject = entryCode;
+        drawBackground(NP.bgType);
+
         NP.ctx.clearRect(0, 0, NP.canvas.width, NP.canvas.height);
-        NP.ctx.drawImage(img, 0, 0);
+        NP.ctx.drawImage(img, 0, 0, NP.canvas.width, NP.canvas.height);
         NP.currentEntryId = entry.id;
-        NP.currentSubject = entry.subject || NP.currentSubject;
         resetHistoryWithCurrent();
-        renderSavedList();
-        console.log('[Notepad] Canvas loaded successfully');
+        document.querySelectorAll('.saved-item').forEach(function (el) {
+            el.classList.toggle('active', el.dataset.id === entry.id);
+        });
+        AccountifyUI.toast('Loaded saved page', 'success');
     };
-    img.onerror = function () {
-        console.error('[Notepad] Failed to load image');
-        alert('Failed to load canvas image');
-    };
-    img.src = entry.image_data;
+    img.src = entry.drawDataUrl || entry.imageData;
 }
 
 function logout() {
