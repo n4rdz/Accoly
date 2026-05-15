@@ -74,17 +74,31 @@ function initSubjectSelect() {
     });
 }
 
+function checkStandardsUploadPermission(user) {
+    if (!user) return Promise.resolve(false);
+    if (user.allowStandardsUpload === true) return Promise.resolve(true);
+    return SupabaseClient.getUserStats(user.id)
+        .then(function (stats) {
+            return !!(stats && stats.level >= 3);
+        })
+        .catch(function () {
+            return Storage.canUpload(user);
+        });
+}
+
 function initUploadUi(user) {
-    var can = Storage.canUpload(user);
-    var btn = document.getElementById('btnUploadStd');
-    var hint = document.getElementById('uploadRestrictedHint');
-    if (can) {
-        btn.style.display = 'inline-block';
-        hint.style.display = 'none';
-    } else {
-        btn.style.display = 'none';
-        hint.style.display = 'inline-block';
-    }
+    checkStandardsUploadPermission(user).then(function (can) {
+        var btn = document.getElementById('btnUploadStd');
+        var hint = document.getElementById('uploadRestrictedHint');
+        if (!btn || !hint) return;
+        if (can) {
+            btn.style.display = 'inline-block';
+            hint.style.display = 'none';
+        } else {
+            btn.style.display = 'none';
+            hint.style.display = 'inline-block';
+        }
+    });
 }
 
 function bindEvents() {
@@ -95,11 +109,13 @@ function bindEvents() {
 
     document.getElementById('btnUploadStd').addEventListener('click', function () {
         var user = Storage.getCurrentUser();
-        if (!Storage.canUpload(user)) {
-            AccountifyUI.toast('Only Senior Reviewer (Level 3+) can upload.', 'error');
-            return;
-        }
-        openStdModal();
+        checkStandardsUploadPermission(user).then(function (can) {
+            if (!can) {
+                AccountifyUI.toast('Only Senior Reviewer (Level 3+) can upload.', 'error');
+                return;
+            }
+            openStdModal();
+        });
     });
 
     document.getElementById('stdModalClose').addEventListener('click', closeStdModal);
@@ -274,11 +290,16 @@ function downloadDataUrl(filename, dataUrl) {
 
 function submitStandard() {
     var user = Storage.getCurrentUser();
-    if (!Storage.canUpload(user)) {
-        AccountifyUI.toast('You do not have permission to upload.', 'error');
-        return;
-    }
+    checkStandardsUploadPermission(user).then(function (can) {
+        if (!can) {
+            AccountifyUI.toast('You do not have permission to upload.', 'error');
+            return;
+        }
+        submitStandardAuthorized(user);
+    });
+}
 
+function submitStandardAuthorized(user) {
     var title = (document.getElementById('stdTitle').value || '').trim();
     var description = (document.getElementById('stdDesc').value || '').trim();
     var subject = document.getElementById('stdSubject').value;
