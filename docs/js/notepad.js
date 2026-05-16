@@ -540,8 +540,8 @@ function renderSavedList() {
     container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Loading...</p>';
 
     if (!window.SupabaseClient || !SupabaseClient.getNotepadEntries) {
-        console.warn('[Notepad] SupabaseClient not available');
-        container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
+        console.warn('[Notepad] SupabaseClient not available, retrying in 500ms');
+        setTimeout(renderSavedList, 500);
         return;
     }
 

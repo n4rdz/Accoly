@@ -665,3 +665,6 @@ const SupabaseClient = {
         };
     }
 };
+
+// Expose globally
+window.SupabaseClient = SupabaseClient;
