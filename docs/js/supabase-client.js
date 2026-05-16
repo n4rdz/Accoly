@@ -372,11 +372,10 @@ const SupabaseClient = {
     },
 
     addNotification: async function (entry) {
-        const { data, error } = await _sb.from('notifications').insert({
+        const { error } = await _sb.from('notifications').insert({
             user_id: entry.userId, message: entry.message, read: false, created_at: new Date().toISOString()
-        }).select().single();
-        if (error || !data) return null;
-        return { id: data.id, userId: data.user_id, message: data.message, date: data.created_at, read: data.read };
+        });
+        return !error;
     },
 
     markAllNotificationsRead: async function (userId) {
