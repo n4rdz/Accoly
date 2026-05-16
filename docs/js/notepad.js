@@ -33,13 +33,25 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function initNotepad() {
-    if (_notepadInitialized) return;
+    console.log('[Notepad] initNotepad called');
+    if (_notepadInitialized) {
+        console.log('[Notepad] Already initialized, skipping');
+        return;
+    }
     var user = Storage.getCurrentUser();
-    if (!user) return;
+    console.log('[Notepad] User:', !!user);
+    if (!user) {
+        console.log('[Notepad] No user, aborting');
+        return;
+    }
 
     NP.canvas = document.getElementById('drawingCanvas');
     NP.bgCanvas = document.getElementById('bgCanvas');
-    if (!NP.canvas || !NP.bgCanvas) return;
+    console.log('[Notepad] canvas:', !!NP.canvas, 'bgCanvas:', !!NP.bgCanvas);
+    if (!NP.canvas || !NP.bgCanvas) {
+        console.log('[Notepad] Canvas elements not found, aborting');
+        return;
+    }
 
     _notepadInitialized = true;
     NP.ctx = NP.canvas.getContext('2d', { willReadFrequently: true });
@@ -53,12 +65,15 @@ function initNotepad() {
     var _subSel = document.getElementById('notepadSubjectSelect');
     if (_subSel && _subSel.value) NP.currentSubject = _subSel.value;
     if (!NP.currentSubject) NP.currentSubject = 'FAR';
+    console.log('[Notepad] Current subject:', NP.currentSubject);
     // Render saved list after auth session is established
     setTimeout(function() {
+        console.log('[Notepad] First setTimeout executing');
         var _s = document.getElementById('notepadSubjectSelect');
         if (_s && _s.value) NP.currentSubject = _s.value;
         renderSavedList();
         setTimeout(function() {
+            console.log('[Notepad] Second setTimeout executing');
             var container = document.getElementById('savedList');
             if (container && container.querySelector('p')) {
                 var _s2 = document.getElementById('notepadSubjectSelect');
