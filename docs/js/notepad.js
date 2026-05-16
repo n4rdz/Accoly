@@ -19,8 +19,7 @@ var NP = {
     historyStep: -1,
     maxHistory: 28,
     currentEntryId: null,
-    currentSubject: 'FAR',
-    uploadedImages: [] // Track uploaded images to protect from eraser
+    currentSubject: 'FAR'
 };
 
 var _notepadInitialized = false;
@@ -43,8 +42,8 @@ function initNotepad() {
     if (!NP.canvas || !NP.bgCanvas) return;
 
     _notepadInitialized = true;
-    NP.ctx = NP.canvas.getContext('2d');
-    NP.bgCtx = NP.bgCanvas.getContext('2d');
+    NP.ctx = NP.canvas.getContext('2d', { willReadFrequently: true });
+    NP.bgCtx = NP.bgCanvas.getContext('2d', { willReadFrequently: true });
 
     initCanvasSurface();
     bindToolbars();
@@ -54,8 +53,20 @@ function initNotepad() {
     var _subSel = document.getElementById('notepadSubjectSelect');
     if (_subSel && _subSel.value) NP.currentSubject = _subSel.value;
     if (!NP.currentSubject) NP.currentSubject = 'FAR';
-    // Render saved list
-    renderSavedList();
+    // Render saved list after auth session is established
+    setTimeout(function() {
+        var _s = document.getElementById('notepadSubjectSelect');
+        if (_s && _s.value) NP.currentSubject = _s.value;
+        renderSavedList();
+        setTimeout(function() {
+            var container = document.getElementById('savedList');
+            if (container && container.querySelector('p')) {
+                var _s2 = document.getElementById('notepadSubjectSelect');
+                if (_s2 && _s2.value) NP.currentSubject = _s2.value;
+                renderSavedList();
+            }
+        }, 2000);
+    }, 500);
 
     window.addEventListener('resize', scheduleResizeCanvas);
     scheduleResizeCanvas();
@@ -66,12 +77,12 @@ function scheduleResizeCanvas() {
     requestAnimationFrame(resizeCanvasDisplay);
 }
 
-/** Keeps backing store at 1200×660; scales display via CSS. */
+/** Keeps backing store at 800×440; scales display via CSS. */
 function resizeCanvasDisplay() {
     var wrap = NP.canvas.parentElement;
     if (!wrap) return;
-    var maxW = Math.min(wrap.clientWidth - 32, 1200);
-    var h = Math.round(maxW * (660 / 1200));
+    var maxW = Math.min(wrap.clientWidth - 32, 920);
+    var h = Math.round(maxW * (440 / 800));
     NP.canvas.style.width = maxW + 'px';
     NP.canvas.style.height = h + 'px';
     if (NP.bgCanvas) {
@@ -258,18 +269,9 @@ function bindNotepadExtras() {
             var img = new Image();
             img.onload = function () {
                 try {
-                    // Draw image on background canvas (protected from eraser)
-                    NP.bgCtx.drawImage(img, 0, 0, NP.bgCanvas.width, NP.bgCanvas.height);
-                    // Track uploaded image for protection
-                    NP.uploadedImages.push({
-                        x: 0,
-                        y: 0,
-                        width: NP.bgCanvas.width,
-                        height: NP.bgCanvas.height,
-                        dataUrl: url
-                    });
+                    NP.ctx.drawImage(img, 0, 0, NP.canvas.width, NP.canvas.height);
                     pushHistory();
-                    AccountifyUI.toast('Image placed on canvas (protected from eraser)', 'success');
+                    AccountifyUI.toast('Image placed on canvas', 'success');
                 } finally {
                     URL.revokeObjectURL(url);
                 }
@@ -303,7 +305,7 @@ function applyToolStyle() {
     ctx.shadowColor = 'transparent';
 
     if (NP.tool === 'eraser') {
-        // Erase only on drawing layer; background and uploaded images stay intact.
+        // Erase only on drawing layer; background stays intact on bgCanvas.
         ctx.globalCompositeOperation = 'destination-out';
         ctx.globalAlpha = 1;
         ctx.strokeStyle = 'rgba(0,0,0,1)';
@@ -538,7 +540,7 @@ function renderSavedList() {
             });
 
             if (list.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet. Draw something and save it!</p>';
+                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet.</p>';
                 return;
             }
 
@@ -559,31 +561,19 @@ function appendSavedListItem(container, entry) {
         var div = document.createElement('div');
         div.className = 'saved-item' + (entry.id === NP.currentEntryId ? ' active' : '');
         div.dataset.id = entry.id;
-        div.style.cursor = 'pointer';
-        div.style.marginBottom = '0.75rem';
-        div.style.padding = '0.5rem';
-        div.style.border = '1px solid var(--border-color)';
-        div.style.borderRadius = '0.5rem';
 
         var img = document.createElement('img');
         img.className = 'saved-thumb';
         img.src = entry.previewDataUrl || entry.imageData;
         img.alt = 'Saved drawing';
-        img.style.width = '100%';
-        img.style.height = 'auto';
-        img.style.borderRadius = '0.25rem';
-        img.style.display = 'block';
-        img.style.marginBottom = '0.35rem';
 
         var small = document.createElement('small');
         small.textContent = new Date(entry.createdAt).toLocaleString();
-        small.style.color = 'var(--text-secondary)';
-        small.style.display = 'block';
-        small.style.marginBottom = '0.35rem';
 
         var row = document.createElement('div');
         row.style.display = 'flex';
         row.style.gap = '0.35rem';
+        row.style.marginTop = '0.35rem';
 
         var loadBtn = document.createElement('button');
         loadBtn.type = 'button';
