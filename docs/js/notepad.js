@@ -561,14 +561,31 @@ function appendSavedListItem(container, entry) {
         var div = document.createElement('div');
         div.className = 'saved-item' + (entry.id === NP.currentEntryId ? ' active' : '');
         div.dataset.id = entry.id;
+        div.style.cursor = 'pointer';
+        div.style.marginBottom = '0.75rem';
+        div.style.padding = '0.5rem';
+        div.style.border = '1px solid var(--border-color, #e5e7eb)';
+        div.style.borderRadius = '0.5rem';
+        div.style.backgroundColor = 'var(--card-bg, #ffffff)';
 
         var img = document.createElement('img');
         img.className = 'saved-thumb';
         img.src = entry.previewDataUrl || entry.imageData;
         img.alt = 'Saved drawing';
+        img.style.width = '100%';
+        img.style.height = 'auto';
+        img.style.maxHeight = '150px';
+        img.style.objectFit = 'contain';
+        img.style.borderRadius = '0.25rem';
+        img.style.display = 'block';
+        img.style.marginBottom = '0.35rem';
+        img.style.backgroundColor = '#ffffff';
 
         var small = document.createElement('small');
         small.textContent = new Date(entry.createdAt).toLocaleString();
+        small.style.color = 'var(--text-secondary, #6b7280)';
+        small.style.display = 'block';
+        small.style.marginBottom = '0.35rem';
 
         var row = document.createElement('div');
         row.style.display = 'flex';
@@ -641,7 +658,11 @@ function loadEntry(entry) {
         document.querySelectorAll('.saved-item').forEach(function (el) {
             el.classList.toggle('active', el.dataset.id === entry.id);
         });
-        AccountifyUI.toast('Loaded saved page', 'success');
+        AccountifyUI.toast('Loaded saved page - ready to edit', 'success');
+    };
+    img.onerror = function() {
+        console.error('[Notepad] Failed to load saved canvas image');
+        AccountifyUI.toast('Failed to load saved page', 'error');
     };
     img.src = entry.drawDataUrl || entry.imageData;
 }
