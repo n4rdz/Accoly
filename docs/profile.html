@@ -220,14 +220,6 @@
                             <div id="studyCalendar" class="study-calendar profile-calendar"></div>
                         </section>
 
-                        <section class="profile-section card profile-section--flush profile-premium-cta">
-                            <h2>Premium</h2>
-                            <p class="profile-lead">Group chat, anonymous posts, and quiz explanations.</p>
-                            <div class="profile-premium-actions">
-                                <button type="button" class="btn btn-primary" id="profileUpgradeBtn">Upgrade to Premium</button>
-                                <button type="button" class="btn btn-outline" id="profileAdvancedAnalyticsBtn" data-premium="true">Advanced analytics</button>
-                            </div>
-                        </section>
                     </div>
                 </div>
             </div>
@@ -244,28 +236,5 @@
     <script src="js/offline.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/profile.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var up = document.getElementById('profileUpgradeBtn');
-            var adv = document.getElementById('profileAdvancedAnalyticsBtn');
-            if (!up) return;
-            if (window.AccolySubscription && AccolySubscription.isPremiumUser()) {
-                up.textContent = 'Premium active';
-                up.disabled = true;
-                up.classList.remove('btn-primary');
-                up.classList.add('btn-outline');
-            } else {
-                up.addEventListener('click', function () {
-                    checkPremiumAccess('Premium subscription');
-                });
-            }
-            if (adv) {
-                adv.addEventListener('click', function () {
-                    if (!checkPremiumAccess('Advanced analytics')) return;
-                    AccountifyUI.toast('Advanced analytics opened (demo)', 'success');
-                });
-            }
-        });
-    </script>
 </body>
 </html>

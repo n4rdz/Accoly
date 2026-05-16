@@ -10,6 +10,29 @@ document.addEventListener('DOMContentLoaded', function () {
             initDashboard();
         });
     }
+
+    // Add search functionality
+    var searchInput = document.querySelector('.search-bar input');
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            var query = searchInput.value.trim().toLowerCase();
+            if (!query) {
+                loadRecentActivityFromAttempts([]);
+                return;
+            }
+            var user = Storage.getCurrentUser();
+            if (!user) return;
+            SupabaseClient.getQuizAttempts(user.id).then(function (attempts) {
+                var filtered = attempts.filter(function (a) {
+                    var subject = window.AccolyStats ? AccolyStats.getSubjectLabel(a.subject) : a.subject;
+                    return subject.toLowerCase().indexOf(query) !== -1;
+                });
+                loadRecentActivityFromAttempts(filtered);
+            }).catch(function () {
+                loadRecentActivityFromAttempts([]);
+            });
+        });
+    }
 });
 
 function initDashboard() {

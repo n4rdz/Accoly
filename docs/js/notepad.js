@@ -19,7 +19,8 @@ var NP = {
     historyStep: -1,
     maxHistory: 28,
     currentEntryId: null,
-    currentSubject: 'FAR'
+    currentSubject: 'FAR',
+    uploadedImages: [] // Track uploaded images to protect from eraser
 };
 
 var _notepadInitialized = false;
@@ -77,12 +78,12 @@ function scheduleResizeCanvas() {
     requestAnimationFrame(resizeCanvasDisplay);
 }
 
-/** Keeps backing store at 800×440; scales display via CSS. */
+/** Keeps backing store at 1200×660; scales display via CSS. */
 function resizeCanvasDisplay() {
     var wrap = NP.canvas.parentElement;
     if (!wrap) return;
-    var maxW = Math.min(wrap.clientWidth - 32, 920);
-    var h = Math.round(maxW * (440 / 800));
+    var maxW = Math.min(wrap.clientWidth - 32, 1200);
+    var h = Math.round(maxW * (660 / 1200));
     NP.canvas.style.width = maxW + 'px';
     NP.canvas.style.height = h + 'px';
     if (NP.bgCanvas) {
@@ -269,9 +270,18 @@ function bindNotepadExtras() {
             var img = new Image();
             img.onload = function () {
                 try {
-                    NP.ctx.drawImage(img, 0, 0, NP.canvas.width, NP.canvas.height);
+                    // Draw image on background canvas (protected from eraser)
+                    NP.bgCtx.drawImage(img, 0, 0, NP.bgCanvas.width, NP.bgCanvas.height);
+                    // Track uploaded image for protection
+                    NP.uploadedImages.push({
+                        x: 0,
+                        y: 0,
+                        width: NP.bgCanvas.width,
+                        height: NP.bgCanvas.height,
+                        dataUrl: url
+                    });
                     pushHistory();
-                    AccountifyUI.toast('Image placed on canvas', 'success');
+                    AccountifyUI.toast('Image placed on canvas (protected from eraser)', 'success');
                 } finally {
                     URL.revokeObjectURL(url);
                 }
@@ -305,7 +315,7 @@ function applyToolStyle() {
     ctx.shadowColor = 'transparent';
 
     if (NP.tool === 'eraser') {
-        // Erase only on drawing layer; background stays intact on bgCanvas.
+        // Erase only on drawing layer; background and uploaded images stay intact.
         ctx.globalCompositeOperation = 'destination-out';
         ctx.globalAlpha = 1;
         ctx.strokeStyle = 'rgba(0,0,0,1)';

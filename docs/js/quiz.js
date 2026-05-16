@@ -205,12 +205,23 @@ function loadQuestion() {
     // Update question navigator
     updateQuestionNavigator();
 
-    // Update submit button text
+    // Update submit button text and state
     const submitBtn = document.getElementById('submitBtn');
+    updateSubmitButton();
+}
+
+function updateSubmitButton() {
+    const submitBtn = document.getElementById('submitBtn');
+    if (!submitBtn) return;
+    
+    // Check if all questions have been answered
+    const allAnswered = currentQuestions.every((q, index) => selectedAnswers[index] !== undefined);
+    
+    submitBtn.disabled = !allAnswered;
     if (currentQuestionIndex === currentQuestions.length - 1) {
-        submitBtn.textContent = 'Submit Quiz';
+        submitBtn.textContent = allAnswered ? 'Submit Quiz' : 'Answer all questions first';
     } else {
-        submitBtn.textContent = 'Submit Quiz';
+        submitBtn.textContent = allAnswered ? 'Submit Quiz' : 'Answer all questions first';
     }
 }
 
@@ -229,6 +240,9 @@ function selectAnswer(index) {
             ${option}
         </button>
     `).join('');
+    
+    // Update submit button state
+    updateSubmitButton();
 }
 
 function updateQuestionNavigator() {
