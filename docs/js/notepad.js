@@ -522,8 +522,10 @@ function renderSavedList() {
         return;
     }
 
+    console.log('[Notepad] Fetching saved entries for user:', user.id, 'subject:', sub);
     SupabaseClient.getNotepadEntries(user.id)
         .then(function (entries) {
+            console.log('[Notepad] Fetched entries:', entries);
             var normalizeCode = function (code) {
                 try {
                     if (window.AccolyStats && typeof AccolyStats.normalizeSubjectCode === 'function') {
@@ -538,6 +540,8 @@ function renderSavedList() {
             }).sort(function (a, b) {
                 return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
             });
+
+            console.log('[Notepad] Filtered list for subject', normalizedSub, ':', list);
 
             if (list.length === 0) {
                 container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet.</p>';
@@ -558,6 +562,7 @@ function renderSavedList() {
 }
 
 function appendSavedListItem(container, entry) {
+        console.log('[Notepad] Appending entry:', entry.id, 'has previewDataUrl:', !!entry.previewDataUrl, 'has imageData:', !!entry.imageData);
         var div = document.createElement('div');
         div.className = 'saved-item' + (entry.id === NP.currentEntryId ? ' active' : '');
         div.dataset.id = entry.id;
@@ -580,6 +585,10 @@ function appendSavedListItem(container, entry) {
         img.style.display = 'block';
         img.style.marginBottom = '0.35rem';
         img.style.backgroundColor = '#ffffff';
+        img.onerror = function() {
+            console.error('[Notepad] Failed to load thumbnail for entry:', entry.id);
+            img.style.display = 'none';
+        };
 
         var small = document.createElement('small');
         small.textContent = new Date(entry.createdAt).toLocaleString();
