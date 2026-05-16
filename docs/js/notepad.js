@@ -54,20 +54,8 @@ function initNotepad() {
     var _subSel = document.getElementById('notepadSubjectSelect');
     if (_subSel && _subSel.value) NP.currentSubject = _subSel.value;
     if (!NP.currentSubject) NP.currentSubject = 'FAR';
-    // Render saved list after auth session is established
-    setTimeout(function() {
-        var _s = document.getElementById('notepadSubjectSelect');
-        if (_s && _s.value) NP.currentSubject = _s.value;
-        renderSavedList();
-        setTimeout(function() {
-            var container = document.getElementById('savedList');
-            if (container && container.querySelector('p')) {
-                var _s2 = document.getElementById('notepadSubjectSelect');
-                if (_s2 && _s2.value) NP.currentSubject = _s2.value;
-                renderSavedList();
-            }
-        }, 2000);
-    }, 500);
+    // Render saved list
+    renderSavedList();
 
     window.addEventListener('resize', scheduleResizeCanvas);
     scheduleResizeCanvas();
@@ -550,7 +538,7 @@ function renderSavedList() {
             });
 
             if (list.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet.</p>';
+                container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">No saved pages yet. Draw something and save it!</p>';
                 return;
             }
 
@@ -571,19 +559,31 @@ function appendSavedListItem(container, entry) {
         var div = document.createElement('div');
         div.className = 'saved-item' + (entry.id === NP.currentEntryId ? ' active' : '');
         div.dataset.id = entry.id;
+        div.style.cursor = 'pointer';
+        div.style.marginBottom = '0.75rem';
+        div.style.padding = '0.5rem';
+        div.style.border = '1px solid var(--border-color)';
+        div.style.borderRadius = '0.5rem';
 
         var img = document.createElement('img');
         img.className = 'saved-thumb';
         img.src = entry.previewDataUrl || entry.imageData;
         img.alt = 'Saved drawing';
+        img.style.width = '100%';
+        img.style.height = 'auto';
+        img.style.borderRadius = '0.25rem';
+        img.style.display = 'block';
+        img.style.marginBottom = '0.35rem';
 
         var small = document.createElement('small');
         small.textContent = new Date(entry.createdAt).toLocaleString();
+        small.style.color = 'var(--text-secondary)';
+        small.style.display = 'block';
+        small.style.marginBottom = '0.35rem';
 
         var row = document.createElement('div');
         row.style.display = 'flex';
         row.style.gap = '0.35rem';
-        row.style.marginTop = '0.35rem';
 
         var loadBtn = document.createElement('button');
         loadBtn.type = 'button';
