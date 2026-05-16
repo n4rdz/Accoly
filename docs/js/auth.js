@@ -62,7 +62,10 @@ function resetAuthReadyState() {
     window.__authReady = false;
 }
 
+var _clearingStaleAuth = false;
 function clearStaleAuthAndRedirect(isProtectedPage) {
+    if (_clearingStaleAuth) return;
+    _clearingStaleAuth = true;
     resetAuthReadyState();
     Storage.logout();
     if (typeof clearSupabaseAuthStorage === 'function') clearSupabaseAuthStorage();
@@ -70,6 +73,7 @@ function clearStaleAuthAndRedirect(isProtectedPage) {
         if (isProtectedPage) {
             window.location.replace('login.html');
         } else {
+            _clearingStaleAuth = false;
             fireAuthReadyOnce();
         }
     };
