@@ -217,7 +217,7 @@ const SupabaseClient = {
     // ── User stats ───────────────────────────────────────────────────────────
 
     getUserStats: async function (userId) {
-        const { data, error } = await _sb.from('user_stats').select('*').eq('user_id', userId).single();
+        const { data, error } = await _sb.from('user_stats').select('*').eq('user_id', userId).maybeSingle();
         if (error || !data) return { totalQuizzes: 0, totalXP: 0, accuracyPercentage: 0, currentStreak: 0, bestScore: 0, level: 1, lastAttemptDate: null };
         return {
             totalQuizzes: data.total_quizzes || 0,
@@ -556,6 +556,31 @@ const SupabaseClient = {
             if (error || !data) return null;
             return { id: data.id, ...entry };
         }
+    },
+
+    // ── Flashcard daily progress ─────────────────────────────────────────────
+
+    getFlashDailyProgress: async function (userId, subject, dateKey) {
+        const { data, error } = await _sb.from('flashcard_daily')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('subject', subject)
+            .eq('date_key', dateKey)
+            .maybeSingle();
+        if (error || !data) return { reviewed: 0, correct: 0, incorrect: 0 };
+        return { reviewed: data.reviewed || 0, correct: data.correct || 0, incorrect: data.incorrect || 0 };
+    },
+
+    saveFlashDailyProgress: async function (userId, subject, dateKey, progress) {
+        const { error } = await _sb.from('flashcard_daily').upsert({
+            user_id: userId,
+            subject: subject,
+            date_key: dateKey,
+            reviewed: progress.reviewed || 0,
+            correct: progress.correct || 0,
+            incorrect: progress.incorrect || 0
+        });
+        return !error;
     },
 
     deleteNotepadEntry: async function (id) {

@@ -114,3 +114,47 @@ const Storage = {
 function canUpload(user) {
     return Storage.canUpload(user);
 }
+
+// ── Flash daily progress (in-memory cache, synced to Supabase) ──────────────
+var _flashDaily = {};
+
+function _flashKey(userId, subject, dateKey) {
+    return userId + ':' + subject + ':' + dateKey;
+}
+
+Storage.getFlashDailyProgress = function (userId, subject, dateKey) {
+    var key = _flashKey(userId, subject, dateKey);
+    if (!_flashDaily[key]) {
+        _flashDaily[key] = { reviewed: 0, correct: 0, incorrect: 0 };
+        // Async load from Supabase in background
+        if (window.SupabaseClient && SupabaseClient.getFlashDailyProgress) {
+            SupabaseClient.getFlashDailyProgress(userId, subject, dateKey).then(function (data) {
+                if (data) _flashDaily[key] = data;
+            }).catch(function () {});
+        }
+    }
+    return Object.assign({}, _flashDaily[key]);
+};
+
+Storage.recordFlashReview = function (userId, subject, dateKey, correct) {
+    var key = _flashKey(userId, subject, dateKey);
+    if (!_flashDaily[key]) _flashDaily[key] = { reviewed: 0, correct: 0, incorrect: 0 };
+    _flashDaily[key].reviewed += 1;
+    if (correct) {
+        _flashDaily[key].correct += 1;
+    } else {
+        _flashDaily[key].incorrect += 1;
+    }
+    // Persist to Supabase in background
+    if (window.SupabaseClient && SupabaseClient.saveFlashDailyProgress) {
+        SupabaseClient.saveFlashDailyProgress(userId, subject, dateKey, _flashDaily[key]).catch(function () {});
+    }
+};
+
+Storage.resetFlashDaily = function (userId, subject, dateKey) {
+    var key = _flashKey(userId, subject, dateKey);
+    _flashDaily[key] = { reviewed: 0, correct: 0, incorrect: 0 };
+    if (window.SupabaseClient && SupabaseClient.saveFlashDailyProgress) {
+        SupabaseClient.saveFlashDailyProgress(userId, subject, dateKey, _flashDaily[key]).catch(function () {});
+    }
+};
