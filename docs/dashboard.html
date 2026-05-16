@@ -194,6 +194,7 @@
             </div>
         </main>
     </div>
+    <script src="js/sw-register.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabase-client.js"></script>
     <script src="js/auth.js"></script>
@@ -203,23 +204,7 @@
     <script src="js/nav-header.js"></script>
     <script src="js/subscription.js"></script>
     <script src="js/offline.js"></script>
+    <script src="js/ui.js"></script>
     <script src="js/dashboard.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var btn = document.getElementById('dashUpgradeBtn');
-            if (!btn || !window.AccolySubscription) return;
-            if (AccolySubscription.isPremiumUser()) {
-                btn.textContent = 'Premium active';
-                btn.disabled = true;
-                btn.classList.remove('btn-primary');
-                btn.classList.add('btn-outline');
-                return;
-            }
-            btn.addEventListener('click', function () {
-                // show the modal by attempting access to a premium feature
-                checkPremiumAccess('Premium subscription');
-            });
-        });
-    </script>
 </body>
 </html>

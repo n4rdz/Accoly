@@ -115,6 +115,31 @@ function renderDashboardMain(user, stats, attempts, flashcardCount, notepadCount
 
     var padEl = document.getElementById('dashNotepadCount');
     if (padEl) padEl.textContent = String(notepadCount || 0);
+
+    // Update premium upgrade button
+    updatePremiumButton();
+}
+
+function updatePremiumButton() {
+    var btn = document.getElementById('dashUpgradeBtn');
+    if (!btn) return;
+    
+    if (window.AccolySubscription && AccolySubscription.isPremiumUser()) {
+        btn.textContent = 'Premium active';
+        btn.disabled = true;
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline');
+    } else {
+        btn.textContent = 'Upgrade to Premium';
+        btn.disabled = false;
+        btn.classList.remove('btn-outline');
+        btn.classList.add('btn-primary');
+        btn.onclick = function() {
+            if (window.AccolySubscription && typeof AccolySubscription.checkPremiumAccess === 'function') {
+                AccolySubscription.checkPremiumAccess('Premium subscription');
+            }
+        };
+    }
 }
 
 function renderSubjectBreakdown(attempts) {
