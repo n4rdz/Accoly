@@ -19,9 +19,10 @@ function initMessages() {
     var user = Storage.getCurrentUser();
     if (!user) return;
 
-    bindPremiumLocks();
     bindChatActions();
     bindGroupModals();
+    // Call bindPremiumLocks after other bindings to ensure button state is correct
+    bindPremiumLocks();
 
     SupabaseClient.getAllUsers()
         .then(function (users) {
@@ -183,7 +184,14 @@ function openGroup(groupId) {
 
 function toggleGroupActions(show) {
     var addBtn = document.getElementById('btnAddGroupMember');
-    if (addBtn) addBtn.hidden = !show;
+    if (addBtn) {
+        addBtn.hidden = !show;
+        // Enable button for premium users when group is selected
+        if (show && msgPremium()) {
+            addBtn.disabled = false;
+            addBtn.removeAttribute('aria-disabled');
+        }
+    }
 }
 
 function renderChat() {
@@ -437,6 +445,11 @@ function bindPremiumLocks() {
     var addBtn = document.getElementById('btnAddGroupMember');
     if (addBtn) {
         addBtn.setAttribute('data-premium', 'true');
+        // Remove the disabled state for premium users
+        if (msgPremium()) {
+            addBtn.disabled = false;
+            addBtn.removeAttribute('aria-disabled');
+        }
         addBtn.addEventListener('click', function () {
             if (!msgPremium()) return checkPremiumAccess('Add group members');
             if (!MSG.activeGroupId) return AccountifyUI.toast('Open a group first', 'warning');
