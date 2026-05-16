@@ -24,6 +24,11 @@ function initQuizCenter() {
     const user = Storage.getCurrentUser();
     if (!user) return; // auth.js already redirected
 
+    // Apply premium locks to UI elements
+    if (window.AccolySubscription && typeof AccolySubscription.applyPremiumLocks === 'function') {
+        AccolySubscription.applyPremiumLocks();
+    }
+
     loadQuizModules();
 }
 
@@ -408,6 +413,11 @@ function showResults(score, correctCount, timeTaken, xpEarned) {
     var panel = document.getElementById('explanationsPanel');
     if (panel) panel.innerHTML = '';
     if (btnExplain) {
+        // Remove any existing premium lock styling for premium users
+        if (window.AccolySubscription && AccolySubscription.isPremiumUser()) {
+            btnExplain.disabled = false;
+            btnExplain.removeAttribute('aria-disabled');
+        }
         btnExplain.onclick = function () {
             if (!checkPremiumAccess('Detailed quiz explanations')) return;
             renderExplanations();
