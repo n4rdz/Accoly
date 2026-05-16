@@ -94,6 +94,9 @@ function resizeCanvasDisplay() {
 function initCanvasSurface() {
     drawBackground(NP.bgType);
     NP.ctx.clearRect(0, 0, NP.canvas.width, NP.canvas.height);
+    // Ensure canvas is visible
+    NP.canvas.style.display = 'block';
+    NP.bgCanvas.style.display = 'block';
     resetHistoryWithCurrent();
 }
 
@@ -201,6 +204,8 @@ function bindToolbars() {
             el.classList.remove('active');
         });
         AccountifyUI.toast('New canvas ready', 'success');
+        // Re-render saved list to show no active selection
+        renderSavedList();
     });
 
     document.getElementById('btnClear').addEventListener('click', function () {
@@ -509,15 +514,18 @@ function exportPng() {
 }
 
 function renderSavedList() {
+    console.log('[Notepad] renderSavedList called');
     var user = Storage.getCurrentUser();
     if (!NP.currentSubject) { var _sel = document.getElementById('notepadSubjectSelect'); NP.currentSubject = (_sel && _sel.value) || 'FAR'; }
     var sub = NP.currentSubject;
     var container = document.getElementById('savedList');
+    console.log('[Notepad] container:', !!container, 'user:', !!user, 'subject:', sub);
     if (!container || !user) { console.warn('[Notepad] renderSavedList early exit — container:', !!container, 'user:', !!user); return; }
 
     container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Loading...</p>';
 
     if (!window.SupabaseClient || !SupabaseClient.getNotepadEntries) {
+        console.warn('[Notepad] SupabaseClient not available');
         container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Could not load saved pages.</p>';
         return;
     }
